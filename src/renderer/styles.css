@@ -3,7 +3,7 @@
   font-family: Inter, Segoe UI, Arial, sans-serif;
   background: #f7f8fa;
   color: #17202a;
-  --preview-height: 460px;
+  --preview-height: clamp(300px, 48vh, 560px);
 }
 
 * {
@@ -12,8 +12,8 @@
 
 body {
   margin: 0;
-  min-width: 960px;
-  min-height: 640px;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -31,8 +31,9 @@ select {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: clamp(260px, 22vw, 340px) minmax(0, 1fr);
   height: 100vh;
+  min-width: 0;
 }
 
 body.mini-mode .app-shell {
@@ -267,7 +268,7 @@ button:disabled {
 
 .workspace {
   display: grid;
-  grid-template-rows: auto var(--preview-height) auto auto auto auto auto;
+  grid-template-rows: auto minmax(300px, var(--preview-height)) auto auto auto auto auto;
   min-width: 0;
   min-height: 0;
   height: 100vh;
@@ -403,6 +404,7 @@ button:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 14px;
   padding: 10px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -414,6 +416,7 @@ button:disabled {
 .transport-group {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -531,6 +534,7 @@ button:disabled {
 
 .record-controls {
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 #topPlayPreview,
@@ -542,7 +546,7 @@ button:disabled {
 
 .editor-panel {
   display: grid;
-  grid-template-columns: 170px 170px 1fr 110px;
+  grid-template-columns: minmax(140px, 170px) minmax(140px, 170px) minmax(180px, 1fr) minmax(90px, 110px);
 }
 
 .editor-section {
@@ -743,4 +747,153 @@ button:disabled {
   color: #b8c4d0;
   font-size: 12px;
   font-weight: 800;
+}
+
+@media (max-width: 1180px) {
+  :root {
+    --preview-height: clamp(300px, 44vh, 520px);
+  }
+
+  .app-shell {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  .topbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .top-actions {
+    justify-content: flex-start;
+  }
+
+  .playback-panel {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .playback-controls,
+  .record-panel,
+  .record-controls {
+    justify-content: flex-start;
+  }
+
+  .record-panel {
+    flex-wrap: wrap;
+  }
+
+  .editor-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tools-panel {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --preview-height: clamp(280px, 42vh, 480px);
+  }
+
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .sidebar {
+    max-height: 40vh;
+    border-right: 0;
+    border-bottom: 1px solid #dce2ea;
+    padding: 14px;
+  }
+
+  .workspace {
+    height: auto;
+    min-height: 60vh;
+    overflow: visible;
+  }
+
+  .stage-transport {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .transport-group .secondary-action,
+  .transport-group .primary-action,
+  .transport-group .danger-action,
+  .playback-controls .secondary-action {
+    min-width: 0;
+  }
+
+  .topbar,
+  .playback-panel,
+  .record-panel,
+  .editor-panel,
+  .tools-panel {
+    padding: 12px 14px;
+  }
+}
+
+body.minimal-ui:not(.mini-mode) {
+  overflow: hidden;
+}
+
+body.minimal-ui:not(.mini-mode) .app-shell {
+  grid-template-columns: 1fr;
+  height: 100vh;
+}
+
+body.minimal-ui:not(.mini-mode) .sidebar,
+body.minimal-ui:not(.mini-mode) .editor-panel,
+body.minimal-ui:not(.mini-mode) .tools-panel,
+body.minimal-ui:not(.mini-mode) .health-strip,
+body.minimal-ui:not(.mini-mode) .stage-transport {
+  display: none;
+}
+
+body.minimal-ui:not(.mini-mode) .workspace {
+  --preview-height: clamp(360px, 68vh, 760px);
+  grid-template-rows: auto minmax(320px, 1fr) auto auto;
+  height: 100vh;
+  overflow: hidden;
+}
+
+body.minimal-ui:not(.mini-mode) .topbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+body.minimal-ui:not(.mini-mode) .top-actions {
+  justify-content: flex-end;
+}
+
+body.minimal-ui:not(.mini-mode) #activeMeta {
+  max-width: 60vw;
+}
+
+body.minimal-ui:not(.mini-mode) .record-panel,
+body.minimal-ui:not(.mini-mode) .playback-panel {
+  padding: 10px 14px;
+}
+
+@media (max-width: 760px) {
+  body.minimal-ui:not(.mini-mode) .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  body.minimal-ui:not(.mini-mode) .top-actions {
+    justify-content: flex-start;
+  }
 }

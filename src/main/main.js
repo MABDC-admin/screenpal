@@ -28,6 +28,7 @@ let activeNativeCapture = null;
 let normalWindowBounds = null;
 let miniRecorderMode = false;
 let cachedCapturePipeline = null;
+let screenshotWindowWasVisible = false;
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
@@ -164,6 +165,24 @@ function exitMiniRecorder() {
   miniRecorderMode = false;
   normalWindowBounds = null;
   showWindow();
+  return true;
+}
+
+async function hideWindowForScreenshot() {
+  if (!mainWindow) return true;
+  screenshotWindowWasVisible = mainWindow.isVisible();
+  mainWindow.hide();
+  await new Promise((resolve) => setTimeout(resolve, 350));
+  return true;
+}
+
+function showWindowAfterScreenshot() {
+  if (!mainWindow) createWindow();
+  if (screenshotWindowWasVisible || !process.env.SCREEN_STUDIO_SELF_TEST) {
+    mainWindow.show();
+    mainWindow.focus();
+  }
+  screenshotWindowWasVisible = false;
   return true;
 }
 
@@ -649,6 +668,63 @@ function resizeImageTo8k(image) {
   });
 }
 
+function ddagrabScreenshotInput(rect) {
+  return ddagrabInput(rect, 1);
+}
+
+function gdigrabScreenshotInput(rect) {
+  return gdigrabInput(rect, 1);
+}
+
+function screenshotScaleFilter(rect) {
+  const target = screenshotTargetSize(rect.width, rect.height);
+  return `scale=${target.width}:${target.height}:flags=lanczos,unsharp=5:5:1.2:3:3:0.4`;
+}
+
+function screenshotPipelines(rect) {
+  return [
+    {
+      backend: 'ddagrab',
+      input: ddagrabScreenshotInput,
+      vf: `hwdownload,format=bgra,${screenshotScaleFilter(rect)}`
+    },
+    {
+      backend: 'gdigrab',
+      input: gdigrabScreenshotInput,
+      vf: `format=bgra,${screenshotScaleFilter(rect)}`
+    }
+  ];
+}
+
+async function captureSharpScreenshotPng(rect, outputPath) {
+  let lastError = null;
+  for (const pipeline of screenshotPipelines(rect)) {
+    const args = [
+      '-hide_banner',
+      '-y',
+      ...pipeline.input(rect),
+      '-frames:v', '1',
+      '-vf', pipeline.vf,
+      '-compression_level', '4',
+      '-pred', 'mixed',
+      outputPath
+    ];
+    try {
+      await runFfmpegProcess(args);
+      const stat = await fs.stat(outputPath);
+      if (stat.size > 0) {
+        log('Captured sharp screenshot', `${pipeline.backend} ${rect.width}x${rect.height} -> ${outputPath}`);
+        return pipeline.backend;
+      }
+      lastError = new Error('FFmpeg screenshot produced an empty image');
+    } catch (error) {
+      lastError = error;
+      log('Sharp screenshot pipeline failed', `${pipeline.backend}: ${error.message}`);
+    }
+  }
+  throw lastError || new Error('No screenshot pipeline worked');
+}
+
 function ddagrabInput(rect, frameRate) {
   const parts = [
     'output_idx=0',
@@ -1048,34 +1124,7 @@ ipcMain.handle('projects:createRecording', async (_event, payload) => {
 ipcMain.handle('projects:capture-screenshot', async (_event, payload = {}) => {
   await ensureRoots();
   const captureConfig = payload.captureConfig || {};
-  const display = screen.getPrimaryDisplay();
-  const scale = display.scaleFactor || 1;
-  const fullWidth = Math.round(display.bounds.width * scale);
-  const fullHeight = Math.round(display.bounds.height * scale);
-  const fullTarget = screenshotTargetSize(fullWidth, fullHeight);
-  const sources = await desktopCapturer.getSources({
-    types: ['screen'],
-    thumbnailSize: fullTarget
-  });
-  const source = sources[0];
-  if (!source || source.thumbnail.isEmpty()) throw new Error('No screen source was available for screenshot capture');
-
   const rect = captureRect(captureConfig);
-  const thumbnailSize = source.thumbnail.getSize();
-  const thumbnailScaleX = thumbnailSize.width / Math.max(1, fullWidth);
-  const thumbnailScaleY = thumbnailSize.height / Math.max(1, fullHeight);
-  const cropX = Math.max(0, Math.round((rect.x - (display.bounds.x * scale)) * thumbnailScaleX));
-  const cropY = Math.max(0, Math.round((rect.y - (display.bounds.y * scale)) * thumbnailScaleY));
-  const cropRect = {
-    x: cropX,
-    y: cropY,
-    width: Math.min(Math.max(1, Math.round(rect.width * thumbnailScaleX)), thumbnailSize.width - cropX),
-    height: Math.min(Math.max(1, Math.round(rect.height * thumbnailScaleY)), thumbnailSize.height - cropY)
-  };
-  const image = resizeImageTo8k(captureConfig.mode === 'region' ? source.thumbnail.crop(cropRect) : source.thumbnail);
-  const bytes = image.toPNG();
-  if (!bytes.length) throw new Error('Screenshot capture produced an empty image');
-
   const createdAt = new Date().toISOString();
   const projectDir = await uniqueProjectDir(payload.title || `Screenshot ${createdAt.slice(0, 19).replace(/[:T]/g, '-')}`);
   const mediaDir = path.join(projectDir, 'media');
@@ -1083,7 +1132,10 @@ ipcMain.handle('projects:capture-screenshot', async (_event, payload = {}) => {
   await fs.mkdir(mediaDir, { recursive: true });
   await fs.mkdir(editsDir, { recursive: true });
   const mediaPath = path.join(mediaDir, 'screenshot.png');
-  await fs.writeFile(mediaPath, bytes);
+  const screenshotBackend = await captureSharpScreenshotPng(rect, mediaPath);
+  const stat = await fs.stat(mediaPath);
+  const image = nativeImage.createFromPath(mediaPath);
+  if (image.isEmpty()) throw new Error('Screenshot capture produced an unreadable PNG');
   const imageSize = image.getSize();
   const meta = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -1091,14 +1143,14 @@ ipcMain.handle('projects:capture-screenshot', async (_event, payload = {}) => {
     createdAt,
     updatedAt: createdAt,
     durationMs: 0,
-    sizeBytes: bytes.length,
+    sizeBytes: stat.size,
     media: {
       source: 'media/screenshot.png',
       mimeType: 'image/png',
-      engine: 'desktop-screenshot',
+      engine: `ffmpeg-${screenshotBackend}-screenshot`,
       width: imageSize.width,
       height: imageSize.height,
-      quality: '8k'
+      quality: '8k-sharp'
     },
     edit: {
       trimStartMs: 0,
@@ -1110,8 +1162,9 @@ ipcMain.handle('projects:capture-screenshot', async (_event, payload = {}) => {
     capture: {
       ...captureConfig,
       rect,
-      engine: 'desktop-screenshot',
-      screenshotQuality: '8k'
+      engine: `ffmpeg-${screenshotBackend}-screenshot`,
+      screenshotQuality: '8k-sharp',
+      screenshotBackend
     },
     exports: []
   };
@@ -1363,6 +1416,14 @@ ipcMain.handle('window:enter-mini-recorder', async () => {
 
 ipcMain.handle('window:show-after-capture', async () => {
   return exitMiniRecorder();
+});
+
+ipcMain.handle('window:hide-for-screenshot', async () => {
+  return await hideWindowForScreenshot();
+});
+
+ipcMain.handle('window:show-after-screenshot', async () => {
+  return showWindowAfterScreenshot();
 });
 
 ipcMain.handle('capture:select-region', async () => {

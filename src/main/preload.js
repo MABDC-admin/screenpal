@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('screenStudio', {
   hideForCapture: () => ipcRenderer.invoke('window:hide-for-capture'),
   enterMiniRecorder: () => ipcRenderer.invoke('window:enter-mini-recorder'),
   showAfterCapture: () => ipcRenderer.invoke('window:show-after-capture'),
+  hideForScreenshot: () => ipcRenderer.invoke('window:hide-for-screenshot'),
+  showAfterScreenshot: () => ipcRenderer.invoke('window:show-after-screenshot'),
   selectRegion: () => ipcRenderer.invoke('capture:select-region'),
   audioDevices: () => ipcRenderer.invoke('capture:audio-devices'),
   diagnostics: () => ipcRenderer.invoke('capture:diagnostics'),

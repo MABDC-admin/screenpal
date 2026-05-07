@@ -16,6 +16,7 @@ const topPlayPreview = document.getElementById('topPlayPreview');
 const topStopPreview = document.getElementById('topStopPreview');
 const topStartCapture = document.getElementById('topStartCapture');
 const topStopCapture = document.getElementById('topStopCapture');
+const toggleMinimalMode = document.getElementById('toggleMinimalMode');
 const dockPlayPreview = document.getElementById('dockPlayPreview');
 const dockStopPreview = document.getElementById('dockStopPreview');
 const stagePlayPreview = document.getElementById('stagePlayPreview');
@@ -312,13 +313,20 @@ async function verifyPlaybackControls() {
 
 function previewFrameMetrics() {
   const stage = document.querySelector('.stage');
+  const workspace = document.querySelector('.workspace');
   const stageRect = stage.getBoundingClientRect();
   const previewRect = preview.getBoundingClientRect();
+  const imageRect = imagePreview.getBoundingClientRect();
+  const workspaceRect = workspace.getBoundingClientRect();
   return {
     windowWidth: window.innerWidth,
     windowHeight: window.innerHeight,
+    workspaceWidth: Math.round(workspaceRect.width),
     stageHeight: Math.round(stageRect.height),
-    previewHeight: Math.round(previewRect.height)
+    stageWidth: Math.round(stageRect.width),
+    previewHeight: Math.round(previewRect.height),
+    imagePreviewHeight: Math.round(imageRect.height),
+    minimalUi: document.body.classList.contains('minimal-ui')
   };
 }
 
@@ -327,10 +335,41 @@ async function verifyFixedPreviewFrame() {
   window.resizeTo(1180, 720);
   await new Promise((resolve) => setTimeout(resolve, 300));
   const after = previewFrameMetrics();
-  if (before.stageHeight !== 460 || before.previewHeight !== 460 || after.stageHeight !== 460 || after.previewHeight !== 460) {
-    throw new Error(`Preview frame resized unexpectedly: ${JSON.stringify({ before, after })}`);
+  const cleanLayout = [before, after].every((metrics) => (
+    metrics.workspaceWidth >= 520 &&
+    metrics.stageWidth >= 520 &&
+    metrics.stageHeight >= 300 &&
+    metrics.stageHeight <= 620 &&
+    Math.abs(metrics.stageHeight - metrics.previewHeight) <= 1
+  ));
+  if (!cleanLayout) {
+    throw new Error(`Preview frame did not adapt cleanly: ${JSON.stringify({ before, after })}`);
   }
-  return { expectedHeight: 460, before, after };
+  return { expected: 'responsive', before, after };
+}
+
+async function verifyMinimalUi() {
+  setMinimalUi(true);
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  const minimal = previewFrameMetrics();
+  const sidebarRect = document.querySelector('.sidebar').getBoundingClientRect();
+  const controlsRect = document.querySelector('.playback-panel').getBoundingClientRect();
+  if (
+    !document.body.classList.contains('minimal-ui') ||
+    sidebarRect.width !== 0 ||
+    controlsRect.width < 300 ||
+    toggleMinimalMode.textContent !== 'Full App' ||
+    minimal.stageHeight < 320
+  ) {
+    throw new Error(`Minimal UI did not activate cleanly: ${JSON.stringify({ minimal, sidebarWidth: sidebarRect.width, controlsWidth: controlsRect.width })}`);
+  }
+  setMinimalUi(false);
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  const restored = previewFrameMetrics();
+  if (document.body.classList.contains('minimal-ui') || toggleMinimalMode.textContent !== 'Minimal') {
+    throw new Error(`Minimal UI did not restore cleanly: ${JSON.stringify({ restored })}`);
+  }
+  return { minimal, restored };
 }
 
 function previewTimelineMetrics() {
@@ -365,8 +404,19 @@ function defaultCaptureMetrics() {
     projectOpenButtons: document.querySelectorAll('.project-open').length,
     minioConfigured: Boolean(minioConfig?.configured),
     screenshotButtonVisible: takeScreenshot.getBoundingClientRect().width > 40,
+    minimalModeButtonVisible: toggleMinimalMode.getBoundingClientRect().width > 40,
     healthPanelVisible: healthEncoder.getBoundingClientRect().width > 40
   };
+}
+
+function setMinimalUi(enabled) {
+  document.body.classList.toggle('minimal-ui', enabled);
+  toggleMinimalMode.textContent = enabled ? 'Full App' : 'Minimal';
+  toggleMinimalMode.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  requestAnimationFrame(() => {
+    updatePreviewTimeline();
+    updatePlaybackControls();
+  });
 }
 
 async function refreshDiagnostics() {
@@ -1014,12 +1064,15 @@ async function stopRecording() {
         activeProject = renamedProject;
         selectProject(renamedProject.id);
         const fixedPreviewFrame = await verifyFixedPreviewFrame();
+        const minimalUi = await verifyMinimalUi();
         const playback = await verifyPlaybackControls();
         const upload = minioConfig?.configured ? await window.screenStudio.uploadProject(renamedProject.path) : null;
+        await window.screenStudio.hideForScreenshot();
         const screenshot = await window.screenStudio.captureScreenshot({
           title: `Self-test Screenshot ${Date.now()}`,
-          captureConfig: { mode: 'full', quality: recordingQuality.value }
+          captureConfig: { mode: 'full', quality: recordingQuality.value, screenshotQuality: '8k-sharp' }
         });
+        await window.screenStudio.showAfterScreenshot();
         projects = await window.screenStudio.listProjects();
         selectProject(screenshot.id);
         const screenshotPreview = {
@@ -1027,28 +1080,32 @@ async function stopRecording() {
           mimeType: screenshot.media?.mimeType,
           width: screenshot.media?.width,
           height: screenshot.media?.height,
+          engine: screenshot.media?.engine,
           bytes: screenshot.sizeBytes,
           uploadVisible: uploadProject.getBoundingClientRect().width > 40 && !uploadProject.disabled
         };
-        if (!screenshotPreview.visible || screenshotPreview.mimeType !== 'image/png' || screenshotPreview.bytes <= 0 || screenshotPreview.width < 7680) {
+        if (!screenshotPreview.visible || screenshotPreview.mimeType !== 'image/png' || screenshotPreview.bytes <= 0 || screenshotPreview.width < 7680 || !screenshotPreview.engine?.startsWith('ffmpeg-')) {
           throw new Error(`Screenshot project did not preview correctly: ${JSON.stringify(screenshotPreview)}`);
         }
+        await window.screenStudio.hideForScreenshot();
         const regionScreenshot = await window.screenStudio.captureScreenshot({
           title: `Self-test Region Screenshot ${Date.now()}`,
           captureConfig: {
             mode: 'region',
             quality: recordingQuality.value,
             region: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 },
-            screenshotQuality: '8k'
+            screenshotQuality: '8k-sharp'
           }
         });
+        await window.screenStudio.showAfterScreenshot();
         const regionScreenshotPreview = {
           mimeType: regionScreenshot.media?.mimeType,
           width: regionScreenshot.media?.width,
           height: regionScreenshot.media?.height,
+          engine: regionScreenshot.media?.engine,
           bytes: regionScreenshot.sizeBytes
         };
-        if (regionScreenshotPreview.mimeType !== 'image/png' || regionScreenshotPreview.bytes <= 0 || regionScreenshotPreview.width < 7680) {
+        if (regionScreenshotPreview.mimeType !== 'image/png' || regionScreenshotPreview.bytes <= 0 || regionScreenshotPreview.width < 7680 || !regionScreenshotPreview.engine?.startsWith('ffmpeg-')) {
           throw new Error(`Region screenshot did not save as 8K PNG: ${JSON.stringify(regionScreenshotPreview)}`);
         }
         await window.screenStudio.completeSelfTest({
@@ -1075,6 +1132,7 @@ async function stopRecording() {
           frameRate: renamedProject.capture?.frameRate,
           videoCrf: renamedProject.capture?.videoCrf,
           fixedPreviewFrame,
+          minimalUi,
           miniRecorder: lastMiniRecorderCheck,
           playback,
           screenshot: screenshotPreview,
@@ -1163,6 +1221,7 @@ async function saveRecording() {
   loadDevices();
   if (selfTestMode) {
     const fixedPreviewFrame = await verifyFixedPreviewFrame();
+    const minimalUi = await verifyMinimalUi();
     await window.screenStudio.completeSelfTest({
       ok: true,
       projectPath: project.path,
@@ -1171,6 +1230,7 @@ async function saveRecording() {
       region: captureConfig.region,
       recordAudioRequested: captureConfig.recordAudio,
       fixedPreviewFrame,
+      minimalUi,
       miniRecorder: lastMiniRecorderCheck,
       playbackControlsVisible: playbackControlsVisible()
     });
@@ -1268,6 +1328,7 @@ async function deleteActiveProject() {
 async function captureScreenshotProject() {
   takeScreenshot.disabled = true;
   showJob('Capturing screenshot', 0);
+  let screenshotWindowHidden = false;
   try {
     let screenshotRegion = null;
     if (captureMode.value === 'region') {
@@ -1281,14 +1342,19 @@ async function captureScreenshotProject() {
         return;
       }
     }
+    await window.screenStudio.hideForScreenshot();
+    screenshotWindowHidden = true;
+    await new Promise((resolve) => setTimeout(resolve, 150));
     const project = await window.screenStudio.captureScreenshot({
       title: `Screenshot ${new Date().toLocaleString().replace(/[/:]/g, '-')}`,
       captureConfig: {
         ...buildCaptureConfig(),
         region: screenshotRegion,
-        screenshotQuality: '8k'
+        screenshotQuality: '8k-sharp'
       }
     });
+    await window.screenStudio.showAfterScreenshot();
+    screenshotWindowHidden = false;
     await loadProjects();
     selectProject(project.id);
     showJob('Screenshot saved', 100, 'done');
@@ -1297,6 +1363,9 @@ async function captureScreenshotProject() {
     setStatus(error.message || 'Unable to capture screenshot');
     showJob(error.message || 'Screenshot failed', 0, 'error');
   } finally {
+    if (screenshotWindowHidden) {
+      await window.screenStudio.showAfterScreenshot().catch(() => {});
+    }
     takeScreenshot.disabled = false;
   }
 }
@@ -1431,6 +1500,7 @@ previewTimeline.addEventListener('change', () => {
   updatePreviewTimeline();
 });
 miniStopCapture.addEventListener('click', stopRecording);
+toggleMinimalMode.addEventListener('click', () => setMinimalUi(!document.body.classList.contains('minimal-ui')));
 preview.addEventListener('play', updatePlaybackControls);
 preview.addEventListener('pause', updatePlaybackControls);
 preview.addEventListener('ended', updatePlaybackControls);
