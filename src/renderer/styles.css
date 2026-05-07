@@ -780,6 +780,21 @@ button:disabled {
   box-shadow: 0 10px 22px rgba(17, 24, 39, 0.06);
 }
 
+.project-more {
+  min-height: 88px;
+  border: 1px dashed #bfc9d7;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--teal-dark);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.project-more:hover {
+  background: #eef7f8;
+  border-color: rgba(25, 123, 140, 0.45);
+}
+
 .project-thumb-wrap {
   position: relative;
   display: block;

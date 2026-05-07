@@ -299,12 +299,14 @@ async function uniqueProjectDir(baseName) {
   }
 }
 
-async function readProject(projectDir) {
+async function readProject(projectDir, options = {}) {
   const safeDir = assertProjectPath(projectDir);
   const raw = await fs.readFile(path.join(safeDir, 'project.json'), 'utf8');
   const meta = JSON.parse(raw);
   const mediaPath = path.join(safeDir, meta.media?.source || 'media/capture.webm');
-  const thumbnailPath = await ensureProjectThumbnail(safeDir, meta, mediaPath);
+  const thumbnailPath = await ensureProjectThumbnail(safeDir, meta, mediaPath, {
+    generate: options.generateThumbnail !== false
+  });
   return {
     ...meta,
     path: safeDir,
@@ -313,10 +315,9 @@ async function readProject(projectDir) {
   };
 }
 
-async function ensureProjectThumbnail(projectDir, meta, mediaPath) {
+async function ensureProjectThumbnail(projectDir, meta, mediaPath, options = {}) {
   if (!mediaPath || !fss.existsSync(mediaPath)) return null;
-  if (meta.media?.mimeType?.startsWith('image/')) return mediaPath;
-
+  const generate = options.generate !== false;
   const thumbnailPath = path.join(projectDir, 'media', 'thumbnail.jpg');
   const failedPath = `${thumbnailPath}.failed.json`;
   try {
@@ -325,15 +326,19 @@ async function ensureProjectThumbnail(projectDir, meta, mediaPath) {
       const thumbnailStat = await fs.stat(thumbnailPath);
       if (thumbnailStat.size > 0 && thumbnailStat.mtimeMs >= mediaStat.mtimeMs) return thumbnailPath;
     }
+    if (!generate) return null;
     if (fss.existsSync(failedPath)) {
       const failed = JSON.parse(await fs.readFile(failedPath, 'utf8'));
       if (Math.abs(Number(failed.mediaMtimeMs || 0) - mediaStat.mtimeMs) < 1) return null;
     }
+    const filter = meta.media?.mimeType?.startsWith('image/')
+      ? 'scale=640:-2:flags=lanczos'
+      : 'thumbnail,scale=640:-2:flags=lanczos';
     await runFfmpegProcess([
       '-hide_banner',
       '-y',
       '-i', mediaPath,
-      '-vf', 'thumbnail,scale=640:-2:flags=lanczos',
+      '-vf', filter,
       '-frames:v', '1',
       '-q:v', '2',
       thumbnailPath
@@ -348,7 +353,7 @@ async function ensureProjectThumbnail(projectDir, meta, mediaPath) {
       failedAt: new Date().toISOString(),
       error: error.message
     }, null, 2)).catch(() => {});
-    log('Video thumbnail generation failed', `${mediaPath}: ${error.message}`);
+    log('Project thumbnail generation failed', `${mediaPath}: ${error.message}`);
     return null;
   }
 }
@@ -1268,12 +1273,17 @@ ipcMain.handle('projects:list', async () => {
     const projectDir = path.join(videoRoot, entry.name);
     try {
       const recovered = await recoverProjectFromMedia(projectDir);
-      projects.push(recovered || await readProject(projectDir));
+      projects.push(recovered || await readProject(projectDir, { generateThumbnail: false }));
     } catch {
       // Ignore folders that are not Screen Studio projects.
     }
   }
-  return projects.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  projects.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  for (const project of projects.slice(0, 48)) {
+    if (project.thumbnailPath) continue;
+    project.thumbnailPath = await ensureProjectThumbnail(project.path, project, project.mediaPath, { generate: true });
+  }
+  return projects;
 });
 
 ipcMain.handle('projects:createRecording', async (_event, payload) => {

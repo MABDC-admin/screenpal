@@ -86,6 +86,7 @@ const projectTabs = Array.from(document.querySelectorAll('.project-tab'));
 let projects = [];
 let activeProject = null;
 let projectTab = 'all';
+let projectRenderLimit = 80;
 let mediaRecorder = null;
 let recordingChunks = [];
 let recordingStartedAt = 0;
@@ -118,6 +119,8 @@ let jobHideTimer = null;
 const selfTestMode = new URLSearchParams(window.location.search).get('selftest') === '1';
 const projectBrowserHeightKey = 'screenStudio.projectBrowserHeight';
 const previewHeightKey = 'screenStudio.previewHeight';
+const baseProjectRenderLimit = 80;
+const projectRenderBatchSize = 60;
 
 preview.controls = false;
 preview.disablePictureInPicture = true;
@@ -189,6 +192,7 @@ function projectMatchesTab(project) {
 
 function setProjectTab(tab) {
   projectTab = tab || 'all';
+  projectRenderLimit = baseProjectRenderLimit;
   projectTabs.forEach((button) => {
     const active = button.dataset.projectTab === projectTab;
     button.classList.toggle('active', active);
@@ -198,6 +202,30 @@ function setProjectTab(tab) {
   requestAnimationFrame(() => {
     projectList.scrollTop = 0;
   });
+}
+
+function visibleProjectsForCurrentTab() {
+  return projects.filter(projectMatchesTab);
+}
+
+function updateProjectSelectionStyles() {
+  projectList.querySelectorAll('.project-row').forEach((row) => {
+    const active = row.dataset.projectId === activeProject?.id;
+    row.classList.toggle('active', active);
+  });
+  projectList.querySelectorAll('.project-main').forEach((button) => {
+    const active = button.dataset.projectId === activeProject?.id;
+    button.classList.toggle('active', active);
+  });
+}
+
+function renderMoreProjectsIfNeeded() {
+  const visibleProjects = visibleProjectsForCurrentTab();
+  if (projectRenderLimit >= visibleProjects.length) return;
+  projectRenderLimit = Math.min(projectRenderLimit + projectRenderBatchSize, visibleProjects.length);
+  const scrollTop = projectList.scrollTop;
+  renderProjects();
+  projectList.scrollTop = scrollTop;
 }
 
 function startProjectResize(event) {
@@ -364,13 +392,23 @@ function stopPreviewPlayback() {
 }
 
 async function verifyPlaybackControls() {
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  updatePlaybackControls();
   const buttons = [topPlayPreview, topStopPreview, dockPlayPreview, dockStopPreview];
   const visible = buttons.every((button) => {
     const rect = button.getBoundingClientRect();
     return rect.width > 20 && rect.height > 20;
   });
   if (!visible) throw new Error('Playback controls are not visible');
-  if (buttons.some((button) => button.disabled)) throw new Error('Playback controls are disabled after selecting a project');
+  if (buttons.some((button) => button.disabled)) {
+    throw new Error(`Playback controls are disabled after selecting a project: ${JSON.stringify({
+      activeProject: activeProject?.title,
+      mimeType: activeProject?.media?.mimeType,
+      previewSrc: Boolean(preview.src),
+      srcObject: Boolean(preview.srcObject),
+      disabled: buttons.map((button) => button.disabled)
+    })}`);
+  }
   if (preview.controls) throw new Error('Native video controls are visible in the stage preview');
   projectActionsMenu.open = true;
   await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -677,6 +715,7 @@ async function loadDevices() {
 
 async function loadProjects() {
   projects = await window.screenStudio.listProjects();
+  projectRenderLimit = Math.max(baseProjectRenderLimit, Math.min(projectRenderLimit, projects.length || baseProjectRenderLimit));
   renderProjects();
   if (activeProject) activeProject = projects.find((project) => project.id === activeProject.id) || null;
   if (!activeProject && projects.length) selectProject(projects[0].id);
@@ -696,7 +735,7 @@ function renderProjects() {
     return;
   }
 
-  const visibleProjects = projects.filter(projectMatchesTab);
+  const visibleProjects = visibleProjectsForCurrentTab();
   if (!visibleProjects.length) {
     const empty = document.createElement('div');
     empty.className = 'project-item';
@@ -705,11 +744,15 @@ function renderProjects() {
     return;
   }
 
-  for (const project of visibleProjects) {
+  const fragment = document.createDocumentFragment();
+  const renderedProjects = visibleProjects.slice(0, projectRenderLimit);
+  for (const project of renderedProjects) {
     const row = document.createElement('div');
     row.className = `project-row ${activeProject?.id === project.id ? 'active' : ''}`;
+    row.dataset.projectId = project.id;
     const selectButton = document.createElement('button');
     selectButton.className = `project-main ${activeProject?.id === project.id ? 'active' : ''}`;
+    selectButton.dataset.projectId = project.id;
     const thumbnail = project.thumbnailPath ? mediaUrl(project.thumbnailPath) : '';
     const thumbnailMarkup = thumbnail
       ? `<img class="project-thumb" src="${thumbnail}" alt="" loading="lazy" />`
@@ -745,14 +788,23 @@ function renderProjects() {
     actionBar.className = 'project-card-actions';
     actionBar.append(openButton, renameButton, deleteButton);
     row.append(selectButton, actionBar);
-    projectList.appendChild(row);
+    fragment.appendChild(row);
   }
+  if (projectRenderLimit < visibleProjects.length) {
+    const more = document.createElement('button');
+    more.className = 'project-more';
+    more.type = 'button';
+    more.textContent = `Show ${Math.min(projectRenderBatchSize, visibleProjects.length - projectRenderLimit)} more projects`;
+    more.addEventListener('click', renderMoreProjectsIfNeeded);
+    fragment.appendChild(more);
+  }
+  projectList.appendChild(fragment);
 }
 
 function selectProject(id) {
   hideCountdownOverlay();
   activeProject = projects.find((project) => project.id === id) || null;
-  renderProjects();
+  updateProjectSelectionStyles();
 
   if (!activeProject) {
     activeTitle.textContent = 'New recording';
@@ -1726,6 +1778,12 @@ projectResizeHandle.addEventListener('keydown', (event) => {
   } else if (event.key === 'ArrowDown') {
     event.preventDefault();
     nudgeProjectBrowser(event.shiftKey ? -80 : -24);
+  }
+});
+
+projectList.addEventListener('scroll', () => {
+  if (projectList.scrollTop + projectList.clientHeight >= projectList.scrollHeight - 260) {
+    renderMoreProjectsIfNeeded();
   }
 });
 
