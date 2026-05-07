@@ -92,6 +92,7 @@
             <button id="deleteProject" class="secondary-action warning-action" disabled>Delete</button>
             <button id="exportProject" class="secondary-action" disabled>Export</button>
             <button id="uploadProject" class="secondary-action" disabled>Upload</button>
+            <button id="minioSettings" class="secondary-action">MinIO</button>
           </div>
         </section>
 
@@ -197,6 +198,56 @@
         <section id="jobPanel" class="job-panel" hidden>
           <span id="jobText">Working</span>
           <progress id="jobProgress" max="100" value="0"></progress>
+        </section>
+
+        <section id="minioDialog" class="settings-backdrop" hidden>
+          <form id="minioForm" class="settings-dialog">
+            <div class="settings-head">
+              <div>
+                <h2>MinIO Settings</h2>
+                <p>Saved locally on this PC for uploads.</p>
+              </div>
+              <button id="closeMinioSettings" class="icon-button" type="button" title="Close">×</button>
+            </div>
+            <div class="settings-grid">
+              <label>
+                Endpoint URL
+                <input id="minioEndpoint" type="url" placeholder="https://minio.example.com" required />
+              </label>
+              <label>
+                Bucket
+                <input id="minioBucket" type="text" placeholder="screen-studio" required />
+              </label>
+              <label>
+                Access key
+                <input id="minioAccessKey" type="text" autocomplete="off" required />
+              </label>
+              <label>
+                Secret key
+                <input id="minioSecretKey" type="password" autocomplete="new-password" placeholder="Leave blank to keep saved secret" />
+              </label>
+              <label>
+                Region
+                <input id="minioRegion" type="text" placeholder="us-east-1" />
+              </label>
+              <label>
+                Upload mode
+                <select id="minioUploadMode">
+                  <option value="s3">S3 API</option>
+                  <option value="console-api">Console API</option>
+                </select>
+              </label>
+              <label class="settings-wide">
+                Public base URL
+                <input id="minioPublicBaseUrl" type="url" placeholder="Optional direct or console download URL" />
+              </label>
+            </div>
+            <p id="minioSettingsStatus" class="settings-status">Not tested</p>
+            <div class="dialog-actions">
+              <button id="testMinioSettings" class="secondary-action" type="button">Test</button>
+              <button class="primary-action" type="submit">Save Settings</button>
+            </div>
+          </form>
         </section>
       </main>
     </div>

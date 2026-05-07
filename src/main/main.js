@@ -5,7 +5,7 @@ const fss = require('fs');
 const path = require('path');
 const os = require('os');
 const ffmpegPath = require('ffmpeg-static');
-const { S3Client } = require('@aws-sdk/client-s3');
+const { S3Client, HeadBucketCommand } = require('@aws-sdk/client-s3');
 const { Upload } = require('@aws-sdk/lib-storage');
 const FormData = require('form-data');
 
@@ -99,7 +99,7 @@ function createWindow() {
         isQuitting = true;
         app.quit();
       }
-    }, 25000);
+    }, 45000);
   }
 }
 
@@ -426,6 +426,7 @@ function normalizeMinioConfig(payload = {}) {
 function publicMinioConfig(config) {
   return {
     configured: Boolean(config?.endpoint && config?.bucket && config?.accessKeyId && config?.secretAccessKey),
+    hasSecret: Boolean(config?.secretAccessKey),
     endpoint: config?.endpoint || '',
     bucket: config?.bucket || '',
     accessKeyId: config?.accessKeyId || '',
@@ -433,6 +434,40 @@ function publicMinioConfig(config) {
     publicBaseUrl: config?.publicBaseUrl || '',
     uploadMode: config?.uploadMode || 's3'
   };
+}
+
+function createMinioS3Client(config) {
+  return new S3Client({
+    endpoint: config.endpoint,
+    region: config.region || 'us-east-1',
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: config.accessKeyId,
+      secretAccessKey: config.secretAccessKey
+    }
+  });
+}
+
+async function mergedMinioConfig(payload = {}) {
+  const existing = await readMinioConfig({ includeSecret: true });
+  const merged = {
+    ...(existing || {}),
+    ...payload
+  };
+  if (!String(payload.secretAccessKey || '').trim() && existing?.secretAccessKey) {
+    merged.secretAccessKey = existing.secretAccessKey;
+  }
+  return normalizeMinioConfig(merged);
+}
+
+async function testMinioConfig(config) {
+  if (config.uploadMode === 'console-api') {
+    await consoleApiLogin(config);
+    return { ok: true, mode: 'console-api', bucket: config.bucket };
+  }
+  const client = createMinioS3Client(config);
+  await client.send(new HeadBucketCommand({ Bucket: config.bucket }));
+  return { ok: true, mode: 's3', bucket: config.bucket };
 }
 
 async function readMinioConfig({ includeSecret = false } = {}) {
@@ -1316,10 +1351,16 @@ ipcMain.handle('minio:get-config', async () => {
 
 ipcMain.handle('minio:save-config', async (_event, payload) => {
   await ensureRoots();
-  const config = normalizeMinioConfig(payload);
+  const config = await mergedMinioConfig(payload);
   await fs.writeFile(minioConfigPath, JSON.stringify(config, null, 2));
   log('Saved MinIO config', `${config.endpoint} ${config.bucket}`);
   return publicMinioConfig(config);
+});
+
+ipcMain.handle('minio:test-config', async (_event, payload) => {
+  await ensureRoots();
+  const config = await mergedMinioConfig(payload);
+  return await testMinioConfig(config);
 });
 
 ipcMain.handle('projects:upload-minio', async (_event, projectPath) => {
@@ -1336,15 +1377,7 @@ ipcMain.handle('projects:upload-minio', async (_event, projectPath) => {
   if (config.uploadMode === 'console-api') {
     await uploadViaConsoleApi(config, project, stat, key, jobId);
   } else {
-    const client = new S3Client({
-      endpoint: config.endpoint,
-      region: config.region || 'us-east-1',
-      forcePathStyle: true,
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey
-      }
-    });
+    const client = createMinioS3Client(config);
     const uploader = new Upload({
       client,
       params: {

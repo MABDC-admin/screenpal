@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('screenStudio', {
   openMedia: (projectPath) => ipcRenderer.invoke('projects:openMedia', projectPath),
   getMinioConfig: () => ipcRenderer.invoke('minio:get-config'),
   saveMinioConfig: (payload) => ipcRenderer.invoke('minio:save-config', payload),
+  testMinioConfig: (payload) => ipcRenderer.invoke('minio:test-config', payload),
   paths: () => ipcRenderer.invoke('app:paths'),
   hideForCapture: () => ipcRenderer.invoke('window:hide-for-capture'),
   enterMiniRecorder: () => ipcRenderer.invoke('window:enter-mini-recorder'),

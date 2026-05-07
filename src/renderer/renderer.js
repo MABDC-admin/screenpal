@@ -28,6 +28,7 @@ const recordStatusText = document.getElementById('recordStatusText');
 const recordTimer = document.getElementById('recordTimer');
 const exportProject = document.getElementById('exportProject');
 const uploadProject = document.getElementById('uploadProject');
+const minioSettings = document.getElementById('minioSettings');
 const openFolder = document.getElementById('openFolder');
 const renameProject = document.getElementById('renameProject');
 const dockRenameProject = document.getElementById('dockRenameProject');
@@ -65,6 +66,18 @@ const healthEncoder = document.getElementById('healthEncoder');
 const healthAudio = document.getElementById('healthAudio');
 const healthFfmpeg = document.getElementById('healthFfmpeg');
 const healthMinio = document.getElementById('healthMinio');
+const minioDialog = document.getElementById('minioDialog');
+const minioForm = document.getElementById('minioForm');
+const closeMinioSettings = document.getElementById('closeMinioSettings');
+const testMinioSettings = document.getElementById('testMinioSettings');
+const minioEndpoint = document.getElementById('minioEndpoint');
+const minioBucket = document.getElementById('minioBucket');
+const minioAccessKey = document.getElementById('minioAccessKey');
+const minioSecretKey = document.getElementById('minioSecretKey');
+const minioRegion = document.getElementById('minioRegion');
+const minioUploadMode = document.getElementById('minioUploadMode');
+const minioPublicBaseUrl = document.getElementById('minioPublicBaseUrl');
+const minioSettingsStatus = document.getElementById('minioSettingsStatus');
 
 let projects = [];
 let activeProject = null;
@@ -372,6 +385,28 @@ async function verifyMinimalUi() {
   return { minimal, restored };
 }
 
+async function verifyMinioSettingsDialog() {
+  await openMinioSettings();
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  const dialogRect = minioForm.getBoundingClientRect();
+  const saveButton = minioForm.querySelector('button[type="submit"]');
+  const result = {
+    visible: !minioDialog.hidden && dialogRect.width > 420 && dialogRect.height > 260,
+    endpointPresent: minioEndpoint.value.length > 0,
+    bucketPresent: minioBucket.value.length > 0,
+    accessKeyPresent: minioAccessKey.value.length > 0,
+    testButtonVisible: testMinioSettings.getBoundingClientRect().width > 40,
+    saveButtonVisible: saveButton?.getBoundingClientRect().width > 40,
+    mode: minioUploadMode.value,
+    status: minioSettingsStatus.textContent
+  };
+  closeMinioSettingsDialog();
+  if (!result.visible || !result.endpointPresent || !result.bucketPresent || !result.testButtonVisible || !result.saveButtonVisible) {
+    throw new Error(`MinIO settings dialog is not usable: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
 function previewTimelineMetrics() {
   return {
     visible: previewTimeline.getBoundingClientRect().width > 80,
@@ -403,6 +438,7 @@ function defaultCaptureMetrics() {
     projectRenameButtons: document.querySelectorAll('.project-rename').length,
     projectOpenButtons: document.querySelectorAll('.project-open').length,
     minioConfigured: Boolean(minioConfig?.configured),
+    minioSettingsButtonVisible: minioSettings.getBoundingClientRect().width > 40,
     screenshotButtonVisible: takeScreenshot.getBoundingClientRect().width > 40,
     minimalModeButtonVisible: toggleMinimalMode.getBoundingClientRect().width > 40,
     healthPanelVisible: healthEncoder.getBoundingClientRect().width > 40
@@ -1065,6 +1101,7 @@ async function stopRecording() {
         selectProject(renamedProject.id);
         const fixedPreviewFrame = await verifyFixedPreviewFrame();
         const minimalUi = await verifyMinimalUi();
+        const minioSettingsDialog = await verifyMinioSettingsDialog();
         const playback = await verifyPlaybackControls();
         const upload = minioConfig?.configured ? await window.screenStudio.uploadProject(renamedProject.path) : null;
         await window.screenStudio.hideForScreenshot();
@@ -1133,6 +1170,7 @@ async function stopRecording() {
           videoCrf: renamedProject.capture?.videoCrf,
           fixedPreviewFrame,
           minimalUi,
+          minioSettingsDialog,
           miniRecorder: lastMiniRecorderCheck,
           playback,
           screenshot: screenshotPreview,
@@ -1222,6 +1260,7 @@ async function saveRecording() {
   if (selfTestMode) {
     const fixedPreviewFrame = await verifyFixedPreviewFrame();
     const minimalUi = await verifyMinimalUi();
+    const minioSettingsDialog = await verifyMinioSettingsDialog();
     await window.screenStudio.completeSelfTest({
       ok: true,
       projectPath: project.path,
@@ -1231,6 +1270,7 @@ async function saveRecording() {
       recordAudioRequested: captureConfig.recordAudio,
       fixedPreviewFrame,
       minimalUi,
+      minioSettingsDialog,
       miniRecorder: lastMiniRecorderCheck,
       playbackControlsVisible: playbackControlsVisible()
     });
@@ -1394,53 +1434,80 @@ function hideJobSoon() {
   }, 1600);
 }
 
-async function promptMinioConfig(existing = {}) {
-  const endpoint = await askTextDialog({
-    title: 'MinIO Settings',
-    label: 'MinIO endpoint URL',
-    initialValue: existing.endpoint || 'http://127.0.0.1:9000'
-  });
-  if (!endpoint) return null;
-  const bucket = await askTextDialog({
-    title: 'MinIO Settings',
-    label: 'MinIO bucket name',
-    initialValue: existing.bucket || 'screen-studio'
-  });
-  if (!bucket) return null;
-  const accessKeyId = await askTextDialog({
-    title: 'MinIO Settings',
-    label: 'MinIO access key',
-    initialValue: existing.accessKeyId || ''
-  });
-  if (!accessKeyId) return null;
-  const secretAccessKey = await askTextDialog({
-    title: 'MinIO Settings',
-    label: 'MinIO secret key',
-    inputType: 'password'
-  });
-  if (!secretAccessKey) return null;
-  const region = await askTextDialog({
-    title: 'MinIO Settings',
-    label: 'S3 region',
-    initialValue: existing.region || 'us-east-1',
-    allowEmpty: true
-  }) || 'us-east-1';
-  const publicBaseUrl = await askTextDialog({
-    title: 'MinIO Settings',
-    label: 'Public base URL for uploaded files',
-    initialValue: existing.publicBaseUrl || '',
-    allowEmpty: true
-  }) || '';
-  return { endpoint, bucket, accessKeyId, secretAccessKey, region, publicBaseUrl };
+function minioFormPayload() {
+  return {
+    endpoint: minioEndpoint.value.trim(),
+    bucket: minioBucket.value.trim(),
+    accessKeyId: minioAccessKey.value.trim(),
+    secretAccessKey: minioSecretKey.value,
+    region: minioRegion.value.trim() || 'us-east-1',
+    uploadMode: minioUploadMode.value,
+    publicBaseUrl: minioPublicBaseUrl.value.trim()
+  };
+}
+
+function fillMinioForm(existing = {}) {
+  minioEndpoint.value = existing.endpoint || 'https://minio.web.mabdc.org/api/v1';
+  minioBucket.value = existing.bucket || 'screen-studio';
+  minioAccessKey.value = existing.accessKeyId || '';
+  minioSecretKey.value = '';
+  minioRegion.value = existing.region || 'us-east-1';
+  minioUploadMode.value = existing.uploadMode || (/\/api\/v1$/i.test(existing.endpoint || '') ? 'console-api' : 's3');
+  minioPublicBaseUrl.value = existing.publicBaseUrl || '';
+  minioSecretKey.placeholder = existing.hasSecret ? 'Saved secret kept if blank' : 'Required on first setup';
+  minioSettingsStatus.textContent = existing.configured ? `Configured for ${existing.bucket}` : 'Enter MinIO credentials for this PC';
+  minioSettingsStatus.dataset.state = existing.configured ? 'done' : 'idle';
+}
+
+async function openMinioSettings() {
+  minioConfig = await window.screenStudio.getMinioConfig();
+  fillMinioForm(minioConfig || {});
+  minioDialog.hidden = false;
+  minioEndpoint.focus();
+  minioEndpoint.select();
+}
+
+function closeMinioSettingsDialog() {
+  minioDialog.hidden = true;
+}
+
+async function testMinioForm() {
+  testMinioSettings.disabled = true;
+  minioSettingsStatus.textContent = 'Testing MinIO connection...';
+  minioSettingsStatus.dataset.state = 'running';
+  try {
+    const result = await window.screenStudio.testMinioConfig(minioFormPayload());
+    minioSettingsStatus.textContent = `Connection OK · ${result.mode} · ${result.bucket}`;
+    minioSettingsStatus.dataset.state = 'done';
+    return true;
+  } catch (error) {
+    minioSettingsStatus.textContent = error.message || 'MinIO test failed';
+    minioSettingsStatus.dataset.state = 'error';
+    return false;
+  } finally {
+    testMinioSettings.disabled = false;
+  }
+}
+
+async function saveMinioForm() {
+  minioSettingsStatus.textContent = 'Saving MinIO settings...';
+  minioSettingsStatus.dataset.state = 'running';
+  minioConfig = await window.screenStudio.saveMinioConfig(minioFormPayload());
+  fillMinioForm(minioConfig);
+  refreshDiagnostics();
+  setStatus(`MinIO configured · ${minioConfig.bucket}`);
+  minioSettingsStatus.textContent = `Saved · ${minioConfig.bucket}`;
+  minioSettingsStatus.dataset.state = 'done';
+  showJob('MinIO settings saved', 100, 'done');
+  hideJobSoon();
+  closeMinioSettingsDialog();
 }
 
 async function configureMinioIfNeeded(force = false) {
   minioConfig = minioConfig || await window.screenStudio.getMinioConfig();
   if (!force && minioConfig?.configured) return true;
-  const config = await promptMinioConfig(minioConfig || {});
-  if (!config) return false;
-  minioConfig = await window.screenStudio.saveMinioConfig(config);
-  return Boolean(minioConfig?.configured);
+  await openMinioSettings();
+  return false;
 }
 
 regionOverlay.addEventListener('pointerdown', (event) => {
@@ -1568,6 +1635,22 @@ uploadProject.addEventListener('click', async () => {
     showJob(error.message || 'Upload failed', 0, 'error');
   } finally {
     uploadProject.disabled = !activeProject;
+  }
+});
+
+minioSettings.addEventListener('click', openMinioSettings);
+closeMinioSettings.addEventListener('click', closeMinioSettingsDialog);
+minioDialog.addEventListener('click', (event) => {
+  if (event.target === minioDialog) closeMinioSettingsDialog();
+});
+testMinioSettings.addEventListener('click', testMinioForm);
+minioForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    await saveMinioForm();
+  } catch (error) {
+    minioSettingsStatus.textContent = error.message || 'Unable to save MinIO settings';
+    minioSettingsStatus.dataset.state = 'error';
   }
 });
 
