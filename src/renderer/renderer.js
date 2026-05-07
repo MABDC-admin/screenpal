@@ -115,6 +115,10 @@ let nativeAudioFlags = null;
 let jobHideTimer = null;
 const selfTestMode = new URLSearchParams(window.location.search).get('selftest') === '1';
 
+preview.controls = false;
+preview.disablePictureInPicture = true;
+preview.controlsList = 'nodownload nofullscreen noremoteplayback';
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({
     '&': '&amp;',
@@ -243,6 +247,7 @@ function hideCountdownOverlay() {
 }
 
 function updatePlaybackControls() {
+  preview.controls = false;
   const hasPlayableProject = Boolean(activeProject && !isImageProject() && preview.src && !preview.srcObject);
   const playLabel = hasPlayableProject && !preview.paused && !preview.ended ? 'Pause' : 'Play';
   topPlayPreview.disabled = !hasPlayableProject;
@@ -302,6 +307,7 @@ async function verifyPlaybackControls() {
   });
   if (!visible) throw new Error('Playback controls are not visible');
   if (buttons.some((button) => button.disabled)) throw new Error('Playback controls are disabled after selecting a project');
+  if (preview.controls) throw new Error('Native video controls are visible in the stage preview');
   projectActionsMenu.open = true;
   await new Promise((resolve) => requestAnimationFrame(resolve));
   const uploadVisible = uploadProject.getBoundingClientRect().width > 40 && !uploadProject.disabled;
