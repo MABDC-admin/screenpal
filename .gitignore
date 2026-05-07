@@ -1,0 +1,10 @@
+node_modules/
+npm-debug.log*
+dist/
+out/
+release/
+build/icon.ico
+build/icon.png
+src/assets/default-minio-config.json
+.DS_Store
+*.local

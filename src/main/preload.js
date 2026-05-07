@@ -1,0 +1,30 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('screenStudio', {
+  listProjects: () => ipcRenderer.invoke('projects:list'),
+  createRecording: (payload) => ipcRenderer.invoke('projects:createRecording', payload),
+  updateEdit: (payload) => ipcRenderer.invoke('projects:updateEdit', payload),
+  renameProject: (payload) => ipcRenderer.invoke('projects:rename', payload),
+  deleteProject: (projectPath) => ipcRenderer.invoke('projects:delete', projectPath),
+  exportProject: (projectPath) => ipcRenderer.invoke('projects:export', projectPath),
+  uploadProject: (projectPath) => ipcRenderer.invoke('projects:upload-minio', projectPath),
+  captureScreenshot: (payload) => ipcRenderer.invoke('projects:capture-screenshot', payload),
+  openFolder: (projectPath) => ipcRenderer.invoke('projects:openFolder', projectPath),
+  openMedia: (projectPath) => ipcRenderer.invoke('projects:openMedia', projectPath),
+  getMinioConfig: () => ipcRenderer.invoke('minio:get-config'),
+  saveMinioConfig: (payload) => ipcRenderer.invoke('minio:save-config', payload),
+  paths: () => ipcRenderer.invoke('app:paths'),
+  hideForCapture: () => ipcRenderer.invoke('window:hide-for-capture'),
+  enterMiniRecorder: () => ipcRenderer.invoke('window:enter-mini-recorder'),
+  showAfterCapture: () => ipcRenderer.invoke('window:show-after-capture'),
+  selectRegion: () => ipcRenderer.invoke('capture:select-region'),
+  audioDevices: () => ipcRenderer.invoke('capture:audio-devices'),
+  diagnostics: () => ipcRenderer.invoke('capture:diagnostics'),
+  startNativeCapture: (payload) => ipcRenderer.invoke('capture:start-native', payload),
+  stopNativeCapture: (captureId, payload) => ipcRenderer.invoke('capture:stop-native', captureId, payload),
+  completeSelfTest: (payload) => ipcRenderer.invoke('selftest:complete', payload),
+  onNewRecording: (callback) => ipcRenderer.on('app:new-recording', callback),
+  onStopRecording: (callback) => ipcRenderer.on('app:stop-recording', callback),
+  onExportProgress: (callback) => ipcRenderer.on('export:progress', (_event, payload) => callback(payload)),
+  onUploadProgress: (callback) => ipcRenderer.on('upload:progress', (_event, payload) => callback(payload))
+});

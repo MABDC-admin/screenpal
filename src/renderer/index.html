@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; media-src 'self' file: blob:; img-src 'self' file: data:; connect-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>M.A Brain Screen Studio</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <img class="brand-mark" src="./assets/mabdc-logo-circle.png" alt="" />
+          <div>
+            <h1>M.A Brain Screen Studio</h1>
+            <p id="projectRoot"></p>
+          </div>
+        </div>
+
+        <button id="newRecording" class="primary-action">
+          <span>Record</span>
+        </button>
+        <button id="takeScreenshot" class="secondary-action">
+          <span>Screenshot</span>
+        </button>
+
+        <div class="tool-group">
+          <h2>Capture</h2>
+          <label>
+            Mode
+            <select id="captureMode">
+              <option value="region">Custom region</option>
+              <option value="full" selected>Full screen</option>
+            </select>
+          </label>
+          <label>
+            Recording quality
+            <select id="recordingQuality">
+              <option value="ultra" selected>Ultra HD smooth (GPU)</option>
+              <option value="high">High quality</option>
+              <option value="standard">Standard</option>
+            </select>
+          </label>
+          <label class="check-row">
+            <input id="systemAudio" type="checkbox" checked />
+            Record audio
+          </label>
+          <label class="check-row">
+            <input id="micAudio" type="checkbox" checked />
+            Prefer microphone
+          </label>
+          <label>
+            FFmpeg audio source
+            <select id="micDevice"></select>
+          </label>
+          <label>
+            Countdown
+            <select id="countdown">
+              <option value="3">3 seconds</option>
+              <option value="0">None</option>
+              <option value="5">5 seconds</option>
+              <option value="10">10 seconds</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="library-head">
+          <h2>Projects</h2>
+          <button id="refreshProjects" class="icon-button" title="Refresh">↻</button>
+        </div>
+        <div id="projectList" class="project-list"></div>
+      </aside>
+
+      <main class="workspace">
+        <section class="topbar">
+          <div>
+            <h2 id="activeTitle">New recording</h2>
+            <p id="activeMeta">Ready</p>
+          </div>
+          <div class="top-actions">
+            <button id="topPlayPreview" class="secondary-action" disabled>Play</button>
+            <button id="topStopPreview" class="secondary-action" disabled>Stop Video</button>
+            <button id="topStartCapture" class="primary-action">Record</button>
+            <button id="topStopCapture" class="danger-action" disabled>Stop Rec</button>
+            <button id="renameProject" class="secondary-action" disabled>Rename Video</button>
+            <button id="openFolder" class="secondary-action">Folder</button>
+            <button id="deleteProject" class="secondary-action warning-action" disabled>Delete</button>
+            <button id="exportProject" class="secondary-action" disabled>Export</button>
+            <button id="uploadProject" class="secondary-action" disabled>Upload</button>
+          </div>
+        </section>
+
+        <section class="stage">
+          <video id="preview" controls playsinline></video>
+          <img id="imagePreview" alt="" hidden />
+          <canvas id="recordCanvas" hidden></canvas>
+          <div id="regionOverlay" class="region-overlay" hidden>
+            <div id="regionBox" class="region-box"></div>
+          </div>
+          <div id="countdownOverlay" class="countdown-overlay" hidden>3</div>
+          <div id="emptyState" class="empty-state">
+            <strong>No project selected</strong>
+            <span>Start a recording or select a saved project.</span>
+          </div>
+          <div class="stage-transport">
+            <div class="transport-group">
+              <span>Video Playback</span>
+              <button id="stagePlayPreview" class="secondary-action" disabled>Play</button>
+              <button id="stageStopPreview" class="secondary-action" disabled>Stop Video</button>
+              <button id="stageRenameProject" class="secondary-action" disabled>Rename Video</button>
+            </div>
+            <div class="transport-group">
+              <span>Recording</span>
+              <button id="stageStartCapture" class="primary-action">Record</button>
+              <button id="stageStopCapture" class="danger-action" disabled>Stop Rec</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="playback-panel" id="playbackPanel">
+          <div class="panel-label">Video Playback</div>
+          <div class="playback-timeline">
+            <span id="previewCurrentTime">00:00</span>
+            <input id="previewTimeline" type="range" min="0" max="0" value="0" disabled />
+            <span id="previewDuration">00:00</span>
+          </div>
+          <div class="playback-controls">
+            <button id="dockPlayPreview" class="secondary-action" disabled>Play</button>
+            <button id="dockStopPreview" class="secondary-action" disabled>Stop Video</button>
+            <button id="dockRenameProject" class="secondary-action" disabled>Rename Video</button>
+          </div>
+        </section>
+
+        <section class="record-panel" id="recordPanel">
+          <div class="record-status">
+            <span id="recordDot"></span>
+            <span id="recordStatusText">Idle</span>
+            <span id="recordTimer">00:00</span>
+          </div>
+          <div class="health-strip" aria-label="Capture health">
+            <span id="healthEncoder">Encoder: checking</span>
+            <span id="healthAudio">Audio: checking</span>
+            <span id="healthFfmpeg">FFmpeg: checking</span>
+            <span id="healthMinio">MinIO: checking</span>
+          </div>
+          <div class="record-controls">
+            <button id="startCapture" class="primary-action">Start Capture</button>
+            <button id="pauseCapture" class="secondary-action" disabled>Pause</button>
+            <button id="stopCapture" class="danger-action" disabled>Stop</button>
+          </div>
+        </section>
+
+        <section class="editor-panel">
+          <div class="editor-section">
+            <label for="trimStart">Trim start</label>
+            <input id="trimStart" type="range" min="0" max="0" value="0" disabled />
+            <span id="trimStartText">00:00</span>
+          </div>
+          <div class="editor-section">
+            <label for="trimEnd">Trim end</label>
+            <input id="trimEnd" type="range" min="0" max="0" value="0" disabled />
+            <span id="trimEndText">00:00</span>
+          </div>
+          <div class="timeline">
+            <div id="timelineFill"></div>
+          </div>
+          <div class="editor-section compact-tool">
+            <label for="playbackRate">Speed</label>
+            <select id="playbackRate">
+              <option value="0.5">0.5x</option>
+              <option value="0.75">0.75x</option>
+              <option value="1" selected>1x</option>
+              <option value="1.25">1.25x</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="tools-panel">
+          <label>
+            Watermark
+            <input id="watermarkText" type="text" maxlength="48" placeholder="Optional label" />
+          </label>
+          <label>
+            Caption note
+            <input id="captionText" type="text" maxlength="96" placeholder="Draft caption text" />
+          </label>
+          <button id="saveTools" class="secondary-action" disabled>Save Tools</button>
+        </section>
+
+        <section id="jobPanel" class="job-panel" hidden>
+          <span id="jobText">Working</span>
+          <progress id="jobProgress" max="100" value="0"></progress>
+        </section>
+      </main>
+    </div>
+    <div id="miniRecorder" class="mini-recorder" hidden>
+      <div class="mini-recorder-status">
+        <span class="mini-record-dot"></span>
+        <div>
+          <strong id="miniRecorderTitle">Recording</strong>
+          <span id="miniRecorderMeta">00:00</span>
+        </div>
+      </div>
+      <button id="miniStopCapture" class="danger-action">Stop</button>
+    </div>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

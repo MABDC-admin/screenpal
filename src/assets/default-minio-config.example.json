@@ -1,0 +1,9 @@
+{
+  "endpoint": "https://minio.example.com/api/v1",
+  "bucket": "screen-studio",
+  "accessKeyId": "CHANGE_ME",
+  "secretAccessKey": "CHANGE_ME",
+  "region": "us-east-1",
+  "publicBaseUrl": "https://minio.example.com/api/v1/buckets/screen-studio/objects/download?prefix=",
+  "uploadMode": "console-api"
+}
