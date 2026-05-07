@@ -1,6 +1,6 @@
 {
   "name": "screenpal-cleanroom-clone",
-  "version": "0.9.15",
+  "version": "0.9.16",
   "private": true,
   "description": "Production desktop screen recorder/editor built as a clean-room ScreenPal-style application.",
   "author": "MABDC",

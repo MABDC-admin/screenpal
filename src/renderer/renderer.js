@@ -1,5 +1,7 @@
 const projectList = document.getElementById('projectList');
 const projectRoot = document.getElementById('projectRoot');
+const projectBrowser = document.querySelector('.project-browser');
+const projectResizeHandle = document.getElementById('projectResizeHandle');
 const activeTitle = document.getElementById('activeTitle');
 const activeMeta = document.getElementById('activeMeta');
 const preview = document.getElementById('preview');
@@ -114,6 +116,8 @@ let nativeAudioStartedAt = 0;
 let nativeAudioFlags = null;
 let jobHideTimer = null;
 const selfTestMode = new URLSearchParams(window.location.search).get('selftest') === '1';
+const projectBrowserHeightKey = 'screenStudio.projectBrowserHeight';
+const previewHeightKey = 'screenStudio.previewHeight';
 
 preview.controls = false;
 preview.disablePictureInPicture = true;
@@ -142,6 +146,33 @@ function formatSize(bytes) {
   return `${mb.toFixed(mb >= 100 ? 0 : 1)} MB`;
 }
 
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, Number(value || 0)));
+}
+
+function setProjectBrowserSize(projectHeight, previewHeight, persist = true) {
+  const maxProjectHeight = Math.max(180, Math.min(Math.round(window.innerHeight * 0.62), 620));
+  const nextProjectHeight = clampNumber(projectHeight, 160, maxProjectHeight);
+  const nextPreviewHeight = clampNumber(previewHeight, 260, Math.max(360, Math.round(window.innerHeight * 0.72)));
+  document.documentElement.style.setProperty('--project-browser-height', `${Math.round(nextProjectHeight)}px`);
+  document.documentElement.style.setProperty('--preview-height', `${Math.round(nextPreviewHeight)}px`);
+  projectResizeHandle.setAttribute('aria-valuemin', '160');
+  projectResizeHandle.setAttribute('aria-valuemax', String(maxProjectHeight));
+  projectResizeHandle.setAttribute('aria-valuenow', String(Math.round(nextProjectHeight)));
+  if (persist) {
+    localStorage.setItem(projectBrowserHeightKey, String(Math.round(nextProjectHeight)));
+    localStorage.setItem(previewHeightKey, String(Math.round(nextPreviewHeight)));
+  }
+}
+
+function loadProjectBrowserSize() {
+  const projectHeight = Number(localStorage.getItem(projectBrowserHeightKey));
+  const previewHeight = Number(localStorage.getItem(previewHeightKey));
+  if (Number.isFinite(projectHeight) && projectHeight > 0 && Number.isFinite(previewHeight) && previewHeight > 0) {
+    setProjectBrowserSize(projectHeight, previewHeight, false);
+  }
+}
+
 function mediaUrl(filePath) {
   return `file:///${filePath.replace(/\\/g, '/')}`;
 }
@@ -167,6 +198,39 @@ function setProjectTab(tab) {
   requestAnimationFrame(() => {
     projectList.scrollTop = 0;
   });
+}
+
+function startProjectResize(event) {
+  if (document.body.classList.contains('minimal-ui')) return;
+  event.preventDefault();
+  const startY = event.clientY;
+  const startProjectHeight = projectBrowser.getBoundingClientRect().height;
+  const startPreviewHeight = document.querySelector('.stage').getBoundingClientRect().height;
+  projectBrowser.classList.add('resizing');
+  projectResizeHandle.setPointerCapture?.(event.pointerId);
+
+  function onPointerMove(moveEvent) {
+    const deltaUp = startY - moveEvent.clientY;
+    setProjectBrowserSize(startProjectHeight + deltaUp, startPreviewHeight - deltaUp);
+  }
+
+  function stopResize() {
+    projectBrowser.classList.remove('resizing');
+    projectResizeHandle.releasePointerCapture?.(event.pointerId);
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', stopResize);
+    window.removeEventListener('pointercancel', stopResize);
+  }
+
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', stopResize, { once: true });
+  window.addEventListener('pointercancel', stopResize, { once: true });
+}
+
+function nudgeProjectBrowser(delta, persist = true) {
+  const projectHeight = projectBrowser.getBoundingClientRect().height;
+  const previewHeight = document.querySelector('.stage').getBoundingClientRect().height;
+  setProjectBrowserSize(projectHeight + delta, previewHeight - delta, persist);
 }
 
 function setStatus(text) {
@@ -454,6 +518,34 @@ async function verifyMinimalUi() {
     throw new Error(`Minimal UI did not restore cleanly: ${JSON.stringify({ restored })}`);
   }
   return { minimal, restored };
+}
+
+async function verifyProjectBrowserResize() {
+  setProjectBrowserSize(220, 420, false);
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  const beforeProjectHeight = projectBrowser.getBoundingClientRect().height;
+  const beforeStageHeight = document.querySelector('.stage').getBoundingClientRect().height;
+  nudgeProjectBrowser(130, false);
+  await new Promise((resolve) => setTimeout(resolve, 160));
+  const afterProjectHeight = projectBrowser.getBoundingClientRect().height;
+  const afterStageHeight = document.querySelector('.stage').getBoundingClientRect().height;
+  const handleRect = projectResizeHandle.getBoundingClientRect();
+  const layout = sectionOverlapMetrics();
+  if (
+    handleRect.height < 8 ||
+    afterProjectHeight < beforeProjectHeight + 90 ||
+    layout.overlaps.length > 0
+  ) {
+    throw new Error(`Project browser resize failed: ${JSON.stringify({ beforeProjectHeight, beforeStageHeight, afterProjectHeight, afterStageHeight, handleHeight: handleRect.height, layout })}`);
+  }
+  return {
+    beforeProjectHeight: Math.round(beforeProjectHeight),
+    afterProjectHeight: Math.round(afterProjectHeight),
+    beforeStageHeight: Math.round(beforeStageHeight),
+    afterStageHeight: Math.round(afterStageHeight),
+    handleVisible: handleRect.width > 80 && handleRect.height >= 8,
+    layout
+  };
 }
 
 async function verifyMinioSettingsDialog() {
@@ -1204,6 +1296,7 @@ async function stopRecording() {
         activeProject = renamedProject;
         selectProject(renamedProject.id);
         const fixedPreviewFrame = await verifyFixedPreviewFrame();
+        const projectBrowserResize = await verifyProjectBrowserResize();
         const minimalUi = await verifyMinimalUi();
         const minioSettingsDialog = await verifyMinioSettingsDialog();
         const playback = await verifyPlaybackControls();
@@ -1275,6 +1368,7 @@ async function stopRecording() {
           frameRate: renamedProject.capture?.frameRate,
           videoCrf: renamedProject.capture?.videoCrf,
           fixedPreviewFrame,
+          projectBrowserResize,
           minimalUi,
           minioSettingsDialog,
           miniRecorder: lastMiniRecorderCheck,
@@ -1365,6 +1459,7 @@ async function saveRecording() {
   loadDevices();
   if (selfTestMode) {
     const fixedPreviewFrame = await verifyFixedPreviewFrame();
+    const projectBrowserResize = await verifyProjectBrowserResize();
     const minimalUi = await verifyMinimalUi();
     const minioSettingsDialog = await verifyMinioSettingsDialog();
     await window.screenStudio.completeSelfTest({
@@ -1375,6 +1470,7 @@ async function saveRecording() {
       region: captureConfig.region,
       recordAudioRequested: captureConfig.recordAudio,
       fixedPreviewFrame,
+      projectBrowserResize,
       minimalUi,
       minioSettingsDialog,
       miniRecorder: lastMiniRecorderCheck,
@@ -1622,6 +1718,17 @@ async function configureMinioIfNeeded(force = false) {
   return false;
 }
 
+projectResizeHandle.addEventListener('pointerdown', startProjectResize);
+projectResizeHandle.addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    nudgeProjectBrowser(event.shiftKey ? 80 : 24);
+  } else if (event.key === 'ArrowDown') {
+    event.preventDefault();
+    nudgeProjectBrowser(event.shiftKey ? -80 : -24);
+  }
+});
+
 regionOverlay.addEventListener('pointerdown', (event) => {
   regionDrag = { x: event.clientX, y: event.clientY };
   setRegionBoxFromPoints(regionDrag, regionDrag);
@@ -1798,6 +1905,7 @@ window.screenStudio.onUploadProgress((payload) => {
 window.screenStudio.paths().then((paths) => {
   projectRoot.textContent = paths.videoRoot;
 });
+loadProjectBrowserSize();
 const minioConfigReady = window.screenStudio.getMinioConfig().then((config) => {
   minioConfig = config;
   refreshDiagnostics();

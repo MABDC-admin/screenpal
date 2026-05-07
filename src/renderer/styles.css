@@ -18,6 +18,7 @@
   --amber: #b7791f;
   --red: #be553f;
   --red-dark: #97402e;
+  --project-browser-height: 220px;
   --shadow-sm: 0 8px 22px rgba(17, 24, 39, 0.08);
   --shadow-md: 0 20px 48px rgba(17, 24, 39, 0.14);
   --shadow-lg: 0 28px 78px rgba(17, 24, 39, 0.18);
@@ -296,7 +297,8 @@ button:disabled {
 
 .workspace {
   display: grid;
-  grid-template-rows: auto minmax(340px, var(--preview-height)) auto minmax(200px, 22vh) auto auto auto auto;
+  grid-template-rows: auto minmax(260px, var(--preview-height)) auto var(--project-browser-height) auto auto auto;
+  align-content: start;
   min-width: 0;
   min-height: 0;
   height: 100vh;
@@ -608,13 +610,63 @@ button:disabled {
 
 .project-browser {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: 12px auto minmax(0, 1fr);
   align-items: stretch;
   gap: 10px;
-  min-height: 200px;
-  max-height: 240px;
+  min-height: 160px;
+  height: var(--project-browser-height);
+  max-height: none;
   overflow: hidden;
   background: #ffffff;
+  position: relative;
+  user-select: none;
+}
+
+.project-browser.resizing {
+  cursor: ns-resize;
+}
+
+.project-resize-handle {
+  position: relative;
+  height: 12px;
+  margin: -14px -22px 0;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.project-resize-handle::before {
+  content: "";
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  top: 5px;
+  height: 2px;
+  border-radius: 999px;
+  background: #d6dee8;
+}
+
+.project-resize-handle::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 54px;
+  height: 6px;
+  border-radius: 999px;
+  background: #b8c4d2;
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.92);
+}
+
+.project-resize-handle:hover::after,
+.project-resize-handle:focus-visible::after,
+.project-browser.resizing .project-resize-handle::after {
+  background: var(--teal);
+}
+
+.project-resize-handle:focus-visible {
+  outline: 2px solid rgba(37, 127, 145, 0.35);
+  outline-offset: -2px;
 }
 
 .project-browser-head {
@@ -1242,8 +1294,8 @@ button:disabled {
   }
 
   .project-browser {
-    min-height: 200px;
-    max-height: 210px;
+    min-height: 160px;
+    max-height: none;
   }
 
   .playback-controls,
@@ -1269,6 +1321,7 @@ button:disabled {
 @media (max-width: 900px) {
   :root {
     --preview-height: clamp(300px, 48vh, 540px);
+    --project-browser-height: 220px;
   }
 
   body {
