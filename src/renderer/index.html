@@ -82,17 +82,26 @@
             <p id="activeMeta">Ready</p>
           </div>
           <div class="top-actions">
-            <button id="toggleMinimalMode" class="secondary-action" aria-pressed="false">Minimal</button>
-            <button id="topPlayPreview" class="secondary-action" disabled>Play</button>
-            <button id="topStopPreview" class="secondary-action" disabled>Stop Video</button>
-            <button id="topStartCapture" class="primary-action">Record</button>
-            <button id="topStopCapture" class="danger-action" disabled>Stop Rec</button>
-            <button id="renameProject" class="secondary-action" disabled>Rename Video</button>
-            <button id="openFolder" class="secondary-action">Folder</button>
-            <button id="deleteProject" class="secondary-action warning-action" disabled>Delete</button>
-            <button id="exportProject" class="secondary-action" disabled>Export</button>
-            <button id="uploadProject" class="secondary-action" disabled>Upload</button>
-            <button id="minioSettings" class="secondary-action">MinIO</button>
+            <div class="action-cluster playback-actions" aria-label="Playback actions">
+              <button id="toggleMinimalMode" class="secondary-action compact-action" aria-pressed="false">Minimal</button>
+              <button id="topPlayPreview" class="secondary-action" disabled>Play</button>
+              <button id="topStopPreview" class="secondary-action" disabled>Stop Video</button>
+            </div>
+            <div class="action-cluster record-actions" aria-label="Recording actions">
+              <button id="topStartCapture" class="primary-action">Record</button>
+              <button id="topStopCapture" class="danger-action" disabled>Stop Rec</button>
+            </div>
+            <details id="projectActionsMenu" class="action-menu">
+              <summary class="secondary-action menu-trigger">Project</summary>
+              <div class="action-menu-panel">
+                <button id="renameProject" class="menu-action" type="button" disabled>Rename Video</button>
+                <button id="openFolder" class="menu-action" type="button">Open Folder</button>
+                <button id="exportProject" class="menu-action" type="button" disabled>Export Video</button>
+                <button id="uploadProject" class="menu-action" type="button" disabled>Upload to MinIO</button>
+                <button id="minioSettings" class="menu-action" type="button">MinIO Settings</button>
+                <button id="deleteProject" class="menu-action warning-action" type="button" disabled>Delete Project</button>
+              </div>
+            </details>
           </div>
         </section>
 

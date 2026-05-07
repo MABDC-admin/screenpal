@@ -29,6 +29,7 @@ const recordTimer = document.getElementById('recordTimer');
 const exportProject = document.getElementById('exportProject');
 const uploadProject = document.getElementById('uploadProject');
 const minioSettings = document.getElementById('minioSettings');
+const projectActionsMenu = document.getElementById('projectActionsMenu');
 const openFolder = document.getElementById('openFolder');
 const renameProject = document.getElementById('renameProject');
 const dockRenameProject = document.getElementById('dockRenameProject');
@@ -280,8 +281,12 @@ async function verifyPlaybackControls() {
   });
   if (!visible) throw new Error('Playback controls are not visible');
   if (buttons.some((button) => button.disabled)) throw new Error('Playback controls are disabled after selecting a project');
+  projectActionsMenu.open = true;
+  await new Promise((resolve) => requestAnimationFrame(resolve));
   const uploadVisible = uploadProject.getBoundingClientRect().width > 40 && !uploadProject.disabled;
   if (!uploadVisible) throw new Error('Upload button is not visible after selecting a project');
+  const projectMenuVisible = projectActionsMenu.getBoundingClientRect().width > 40;
+  if (!projectMenuVisible) throw new Error('Project actions menu is not visible');
   const externalOpenVisible = Array.from(document.querySelectorAll('.project-open')).some((button) => {
     const rect = button.getBoundingClientRect();
     return rect.width > 20 && rect.height > 20;
@@ -318,6 +323,7 @@ async function verifyPlaybackControls() {
     uploadVisible,
     externalOpenVisible,
     timeline,
+    projectMenuVisible,
     topPlayLabel: topPlayPreview.textContent,
     dockPlayLabel: dockPlayPreview.textContent,
     stoppedAt: preview.currentTime
@@ -437,6 +443,7 @@ function defaultCaptureMetrics() {
     recordingQuality: recordingQuality.value,
     projectRenameButtons: document.querySelectorAll('.project-rename').length,
     projectOpenButtons: document.querySelectorAll('.project-open').length,
+    projectMenuVisible: projectActionsMenu.getBoundingClientRect().width > 40,
     minioConfigured: Boolean(minioConfig?.configured),
     minioSettingsButtonVisible: minioSettings.getBoundingClientRect().width > 40,
     screenshotButtonVisible: takeScreenshot.getBoundingClientRect().width > 40,
@@ -1568,6 +1575,11 @@ previewTimeline.addEventListener('change', () => {
 });
 miniStopCapture.addEventListener('click', stopRecording);
 toggleMinimalMode.addEventListener('click', () => setMinimalUi(!document.body.classList.contains('minimal-ui')));
+document.addEventListener('click', (event) => {
+  if (projectActionsMenu.open && !projectActionsMenu.contains(event.target)) {
+    projectActionsMenu.open = false;
+  }
+});
 preview.addEventListener('play', updatePlaybackControls);
 preview.addEventListener('pause', updatePlaybackControls);
 preview.addEventListener('ended', updatePlaybackControls);
