@@ -18,6 +18,7 @@ const topPlayPreview = document.getElementById('topPlayPreview');
 const topStopPreview = document.getElementById('topStopPreview');
 const topStartCapture = document.getElementById('topStartCapture');
 const topStopCapture = document.getElementById('topStopCapture');
+const toggleTheme = document.getElementById('toggleTheme');
 const toggleMinimalMode = document.getElementById('toggleMinimalMode');
 const dockPlayPreview = document.getElementById('dockPlayPreview');
 const dockStopPreview = document.getElementById('dockStopPreview');
@@ -119,8 +120,10 @@ let jobHideTimer = null;
 const selfTestMode = new URLSearchParams(window.location.search).get('selftest') === '1';
 const projectBrowserHeightKey = 'screenStudio.projectBrowserHeight';
 const previewHeightKey = 'screenStudio.previewHeight';
+const themeKey = 'screenStudio.theme';
 const baseProjectRenderLimit = 80;
 const projectRenderBatchSize = 60;
+const resizeMinPreviewHeight = 220;
 
 preview.controls = false;
 preview.disablePictureInPicture = true;
@@ -154,9 +157,9 @@ function clampNumber(value, min, max) {
 }
 
 function setProjectBrowserSize(projectHeight, previewHeight, persist = true) {
-  const maxProjectHeight = Math.max(180, Math.min(Math.round(window.innerHeight * 0.62), 620));
+  const maxProjectHeight = Math.max(180, Math.min(Math.round(window.innerHeight * 0.68), 680));
   const nextProjectHeight = clampNumber(projectHeight, 160, maxProjectHeight);
-  const nextPreviewHeight = clampNumber(previewHeight, 260, Math.max(360, Math.round(window.innerHeight * 0.72)));
+  const nextPreviewHeight = clampNumber(previewHeight, resizeMinPreviewHeight, Math.max(360, Math.round(window.innerHeight * 0.76)));
   document.documentElement.style.setProperty('--project-browser-height', `${Math.round(nextProjectHeight)}px`);
   document.documentElement.style.setProperty('--preview-height', `${Math.round(nextPreviewHeight)}px`);
   projectResizeHandle.setAttribute('aria-valuemin', '160');
@@ -168,12 +171,33 @@ function setProjectBrowserSize(projectHeight, previewHeight, persist = true) {
   }
 }
 
+function persistProjectBrowserSize() {
+  localStorage.setItem(projectBrowserHeightKey, String(Math.round(projectBrowser.getBoundingClientRect().height)));
+  localStorage.setItem(previewHeightKey, String(Math.round(document.querySelector('.stage').getBoundingClientRect().height)));
+}
+
 function loadProjectBrowserSize() {
   const projectHeight = Number(localStorage.getItem(projectBrowserHeightKey));
   const previewHeight = Number(localStorage.getItem(previewHeightKey));
   if (Number.isFinite(projectHeight) && projectHeight > 0 && Number.isFinite(previewHeight) && previewHeight > 0) {
     setProjectBrowserSize(projectHeight, previewHeight, false);
   }
+}
+
+function setTheme(theme, persist = true) {
+  const dark = theme === 'dark';
+  document.body.classList.toggle('dark-theme', dark);
+  toggleTheme.textContent = dark ? 'Light' : 'Dark';
+  toggleTheme.setAttribute('aria-pressed', dark ? 'true' : 'false');
+  if (persist) localStorage.setItem(themeKey, dark ? 'dark' : 'light');
+}
+
+function loadTheme() {
+  setTheme(localStorage.getItem(themeKey) === 'dark' ? 'dark' : 'light', false);
+}
+
+function toggleAppTheme() {
+  setTheme(document.body.classList.contains('dark-theme') ? 'light' : 'dark');
 }
 
 function mediaUrl(filePath) {
@@ -234,16 +258,30 @@ function startProjectResize(event) {
   const startY = event.clientY;
   const startProjectHeight = projectBrowser.getBoundingClientRect().height;
   const startPreviewHeight = document.querySelector('.stage').getBoundingClientRect().height;
+  let pendingDelta = 0;
+  let resizeFrame = 0;
   projectBrowser.classList.add('resizing');
+  document.body.classList.add('split-resizing');
   projectResizeHandle.setPointerCapture?.(event.pointerId);
 
+  function applyResizeFrame() {
+    resizeFrame = 0;
+    setProjectBrowserSize(startProjectHeight + pendingDelta, startPreviewHeight - pendingDelta, false);
+  }
+
   function onPointerMove(moveEvent) {
-    const deltaUp = startY - moveEvent.clientY;
-    setProjectBrowserSize(startProjectHeight + deltaUp, startPreviewHeight - deltaUp);
+    pendingDelta = startY - moveEvent.clientY;
+    if (!resizeFrame) resizeFrame = requestAnimationFrame(applyResizeFrame);
   }
 
   function stopResize() {
+    if (resizeFrame) {
+      cancelAnimationFrame(resizeFrame);
+      applyResizeFrame();
+    }
+    persistProjectBrowserSize();
     projectBrowser.classList.remove('resizing');
+    document.body.classList.remove('split-resizing');
     projectResizeHandle.releasePointerCapture?.(event.pointerId);
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', stopResize);
@@ -524,7 +562,7 @@ async function verifyFixedPreviewFrame() {
   const cleanLayout = [before, after].every((metrics) => (
     metrics.workspaceWidth >= 520 &&
     metrics.stageWidth >= 520 &&
-    metrics.stageHeight >= 220 &&
+    metrics.stageHeight >= resizeMinPreviewHeight &&
     metrics.stageHeight <= 620 &&
     Math.abs(metrics.stageHeight - metrics.previewHeight) <= 1
   )) && layout.overlaps.length === 0;
@@ -559,7 +597,9 @@ async function verifyMinimalUi() {
 }
 
 async function verifyProjectBrowserResize() {
-  setProjectBrowserSize(220, 420, false);
+  window.resizeTo(1380, 900);
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  setProjectBrowserSize(220, 480, false);
   await new Promise((resolve) => setTimeout(resolve, 120));
   const beforeProjectHeight = projectBrowser.getBoundingClientRect().height;
   const beforeStageHeight = document.querySelector('.stage').getBoundingClientRect().height;
@@ -572,6 +612,7 @@ async function verifyProjectBrowserResize() {
   if (
     handleRect.height < 8 ||
     afterProjectHeight < beforeProjectHeight + 90 ||
+    afterStageHeight > beforeStageHeight - 90 ||
     layout.overlaps.length > 0
   ) {
     throw new Error(`Project browser resize failed: ${JSON.stringify({ beforeProjectHeight, beforeStageHeight, afterProjectHeight, afterStageHeight, handleHeight: handleRect.height, layout })}`);
@@ -584,6 +625,28 @@ async function verifyProjectBrowserResize() {
     handleVisible: handleRect.width > 80 && handleRect.height >= 8,
     layout
   };
+}
+
+async function verifyThemeToggle() {
+  setTheme('dark', false);
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  const dark = {
+    enabled: document.body.classList.contains('dark-theme'),
+    buttonLabel: toggleTheme.textContent,
+    background: getComputedStyle(document.body).backgroundColor || getComputedStyle(document.body).background,
+    topbar: getComputedStyle(document.querySelector('.topbar')).backgroundColor,
+    sidebar: getComputedStyle(document.querySelector('.sidebar')).backgroundColor
+  };
+  setTheme('light', false);
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  const restored = {
+    enabled: !document.body.classList.contains('dark-theme'),
+    buttonLabel: toggleTheme.textContent
+  };
+  if (!dark.enabled || dark.buttonLabel !== 'Light' || !restored.enabled || restored.buttonLabel !== 'Dark') {
+    throw new Error(`Dark theme toggle failed: ${JSON.stringify({ dark, restored })}`);
+  }
+  return { dark, restored };
 }
 
 async function verifyMinioSettingsDialog() {
@@ -645,6 +708,7 @@ function defaultCaptureMetrics() {
     minioConfigured: Boolean(minioConfig?.configured),
     minioSettingsButtonVisible: minioSettings.getBoundingClientRect().width > 40,
     screenshotButtonVisible: takeScreenshot.getBoundingClientRect().width > 40,
+    darkThemeButtonVisible: toggleTheme.getBoundingClientRect().width > 40,
     minimalModeButtonVisible: toggleMinimalMode.getBoundingClientRect().width > 40,
     healthPanelVisible: healthEncoder.getBoundingClientRect().width > 40
   };
@@ -1349,6 +1413,7 @@ async function stopRecording() {
         selectProject(renamedProject.id);
         const fixedPreviewFrame = await verifyFixedPreviewFrame();
         const projectBrowserResize = await verifyProjectBrowserResize();
+        const darkTheme = await verifyThemeToggle();
         const minimalUi = await verifyMinimalUi();
         const minioSettingsDialog = await verifyMinioSettingsDialog();
         const playback = await verifyPlaybackControls();
@@ -1421,6 +1486,7 @@ async function stopRecording() {
           videoCrf: renamedProject.capture?.videoCrf,
           fixedPreviewFrame,
           projectBrowserResize,
+          darkTheme,
           minimalUi,
           minioSettingsDialog,
           miniRecorder: lastMiniRecorderCheck,
@@ -1512,6 +1578,7 @@ async function saveRecording() {
   if (selfTestMode) {
     const fixedPreviewFrame = await verifyFixedPreviewFrame();
     const projectBrowserResize = await verifyProjectBrowserResize();
+    const darkTheme = await verifyThemeToggle();
     const minimalUi = await verifyMinimalUi();
     const minioSettingsDialog = await verifyMinioSettingsDialog();
     await window.screenStudio.completeSelfTest({
@@ -1523,6 +1590,7 @@ async function saveRecording() {
       recordAudioRequested: captureConfig.recordAudio,
       fixedPreviewFrame,
       projectBrowserResize,
+      darkTheme,
       minimalUi,
       minioSettingsDialog,
       miniRecorder: lastMiniRecorderCheck,
@@ -1844,6 +1912,7 @@ previewTimeline.addEventListener('change', () => {
   updatePreviewTimeline();
 });
 miniStopCapture.addEventListener('click', stopRecording);
+toggleTheme.addEventListener('click', toggleAppTheme);
 toggleMinimalMode.addEventListener('click', () => setMinimalUi(!document.body.classList.contains('minimal-ui')));
 document.addEventListener('click', (event) => {
   if (projectActionsMenu.open && !projectActionsMenu.contains(event.target)) {
@@ -1963,6 +2032,7 @@ window.screenStudio.onUploadProgress((payload) => {
 window.screenStudio.paths().then((paths) => {
   projectRoot.textContent = paths.videoRoot;
 });
+loadTheme();
 loadProjectBrowserSize();
 const minioConfigReady = window.screenStudio.getMinioConfig().then((config) => {
   minioConfig = config;
