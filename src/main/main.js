@@ -608,6 +608,13 @@ function projectUploadKey(project) {
   return `screen-studio/${title}-${project.id}${extension}`;
 }
 
+function imageExportType(project) {
+  const mimeType = project.media?.mimeType || '';
+  if (mimeType === 'image/webp') return { label: 'WEBP image', extension: 'webp', type: 'webp' };
+  if (mimeType === 'image/jpeg') return { label: 'JPEG image', extension: 'jpg', type: 'jpg' };
+  return { label: 'PNG image', extension: 'png', type: 'png' };
+}
+
 function ffmpegTimeToMs(line) {
   const match = /time=(\d+):(\d+):(\d+)\.(\d+)/.exec(line);
   if (!match) return null;
@@ -772,6 +779,120 @@ function screenshotPipelines(rect) {
       vf: `format=bgra,${screenshotScaleFilter(rect)}`
     }
   ];
+}
+
+function screenshotExtensionForMime(mimeType = 'image/png') {
+  if (mimeType === 'image/webp') return '.webp';
+  if (mimeType === 'image/jpeg') return '.jpg';
+  return '.png';
+}
+
+async function compressedScreenshotCandidate(sourcePath, outputPath) {
+  await runFfmpegProcess([
+    '-hide_banner',
+    '-y',
+    '-i', sourcePath,
+    '-frames:v', '1',
+    '-c:v', 'libwebp',
+    '-quality', '95',
+    '-compression_level', '4',
+    '-preset', 'picture',
+    outputPath
+  ]);
+  const stat = await fs.stat(outputPath);
+  if (!stat.size) throw new Error('WebP compressor produced an empty image');
+  return stat;
+}
+
+async function optimizeScreenshotPng(sourcePath, outputPath) {
+  await runFfmpegProcess([
+    '-hide_banner',
+    '-y',
+    '-i', sourcePath,
+    '-frames:v', '1',
+    '-compression_level', '9',
+    '-pred', 'mixed',
+    outputPath
+  ]);
+  const stat = await fs.stat(outputPath);
+  if (!stat.size) throw new Error('PNG optimizer produced an empty image');
+  return stat;
+}
+
+async function compressScreenshotImage(sourcePath, mediaDir) {
+  const originalStat = await fs.stat(sourcePath);
+  const webpPath = path.join(mediaDir, 'screenshot.webp');
+  const optimizedPngPath = path.join(mediaDir, 'screenshot-optimized.png');
+  let best = {
+    path: sourcePath,
+    mimeType: 'image/png',
+    source: 'media/screenshot.png',
+    sizeBytes: originalStat.size,
+    compression: {
+      enabled: true,
+      codec: 'png',
+      originalSizeBytes: originalStat.size,
+      compressedSizeBytes: originalStat.size,
+      savedBytes: 0,
+      ratio: 1
+    }
+  };
+
+  try {
+    const webpStat = await compressedScreenshotCandidate(sourcePath, webpPath);
+    if (webpStat.size < best.sizeBytes) {
+      best = {
+        path: webpPath,
+        mimeType: 'image/webp',
+        source: 'media/screenshot.webp',
+        sizeBytes: webpStat.size,
+        compression: {
+          enabled: true,
+          codec: 'webp-q95',
+          originalSizeBytes: originalStat.size,
+          compressedSizeBytes: webpStat.size,
+          savedBytes: Math.max(0, originalStat.size - webpStat.size),
+          ratio: Number((webpStat.size / Math.max(1, originalStat.size)).toFixed(4))
+        }
+      };
+    } else {
+      await fs.rm(webpPath, { force: true });
+    }
+  } catch (error) {
+    await fs.rm(webpPath, { force: true }).catch(() => {});
+    log('WebP screenshot compression failed', error.message);
+  }
+
+  if (best.path === sourcePath) {
+    try {
+      const optimizedStat = await optimizeScreenshotPng(sourcePath, optimizedPngPath);
+      if (optimizedStat.size < best.sizeBytes) {
+        await fs.rename(optimizedPngPath, sourcePath);
+        best = {
+          ...best,
+          sizeBytes: optimizedStat.size,
+          compression: {
+            enabled: true,
+            codec: 'png-level9',
+            originalSizeBytes: originalStat.size,
+            compressedSizeBytes: optimizedStat.size,
+            savedBytes: Math.max(0, originalStat.size - optimizedStat.size),
+            ratio: Number((optimizedStat.size / Math.max(1, originalStat.size)).toFixed(4))
+          }
+        };
+      } else {
+        await fs.rm(optimizedPngPath, { force: true });
+      }
+    } catch (error) {
+      await fs.rm(optimizedPngPath, { force: true }).catch(() => {});
+      log('PNG screenshot optimization failed', error.message);
+    }
+  }
+
+  if (best.path !== sourcePath) {
+    await fs.rm(sourcePath, { force: true }).catch(() => {});
+  }
+  return best;
 }
 
 async function captureSharpScreenshotPng(rect, outputPath) {
@@ -1209,26 +1330,26 @@ ipcMain.handle('projects:capture-screenshot', async (_event, payload = {}) => {
   const editsDir = path.join(projectDir, 'edits');
   await fs.mkdir(mediaDir, { recursive: true });
   await fs.mkdir(editsDir, { recursive: true });
-  const mediaPath = path.join(mediaDir, 'screenshot.png');
-  const screenshotBackend = await captureSharpScreenshotPng(rect, mediaPath);
-  const stat = await fs.stat(mediaPath);
-  const image = nativeImage.createFromPath(mediaPath);
-  if (image.isEmpty()) throw new Error('Screenshot capture produced an unreadable PNG');
-  const imageSize = image.getSize();
+  const rawPngPath = path.join(mediaDir, 'screenshot.png');
+  const screenshotBackend = await captureSharpScreenshotPng(rect, rawPngPath);
+  const compressed = await compressScreenshotImage(rawPngPath, mediaDir);
+  const image = nativeImage.createFromPath(compressed.path);
+  const imageSize = image.isEmpty() ? screenshotTargetSize(rect.width, rect.height) : image.getSize();
   const meta = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     title: path.basename(projectDir),
     createdAt,
     updatedAt: createdAt,
     durationMs: 0,
-    sizeBytes: stat.size,
+    sizeBytes: compressed.sizeBytes,
     media: {
-      source: 'media/screenshot.png',
-      mimeType: 'image/png',
+      source: compressed.source,
+      mimeType: compressed.mimeType,
       engine: `ffmpeg-${screenshotBackend}-screenshot`,
       width: imageSize.width,
       height: imageSize.height,
-      quality: '8k-sharp'
+      quality: '8k-sharp-compressed',
+      compression: compressed.compression
     },
     edit: {
       trimStartMs: 0,
@@ -1241,8 +1362,9 @@ ipcMain.handle('projects:capture-screenshot', async (_event, payload = {}) => {
       ...captureConfig,
       rect,
       engine: `ffmpeg-${screenshotBackend}-screenshot`,
-      screenshotQuality: '8k-sharp',
-      screenshotBackend
+      screenshotQuality: '8k-sharp-compressed',
+      screenshotBackend,
+      screenshotCompression: compressed.compression
     },
     exports: []
   };
@@ -1304,10 +1426,11 @@ ipcMain.handle('projects:delete', async (_event, projectPath) => {
 ipcMain.handle('projects:export', async (_event, projectPath) => {
   const project = await readProject(projectPath);
   if (project.media?.mimeType?.startsWith('image/')) {
+    const exportType = imageExportType(project);
     const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'Export PNG',
-      defaultPath: `${safeProjectName(project.title)}.png`,
-      filters: [{ name: 'PNG image', extensions: ['png'] }]
+      title: `Export ${exportType.extension.toUpperCase()}`,
+      defaultPath: `${safeProjectName(project.title)}.${exportType.extension}`,
+      filters: [{ name: exportType.label, extensions: [exportType.extension] }]
     });
     if (result.canceled || !result.filePath) return null;
     await fs.copyFile(project.mediaPath, result.filePath);
@@ -1315,7 +1438,7 @@ ipcMain.handle('projects:export', async (_event, projectPath) => {
     meta.updatedAt = new Date().toISOString();
     meta.exports = [
       ...(meta.exports || []),
-      { path: result.filePath, type: 'png', exportedAt: meta.updatedAt }
+      { path: result.filePath, type: exportType.type, exportedAt: meta.updatedAt }
     ];
     await writeProject(project.path, meta);
     sendExportProgress(`${Date.now()}-${Math.random().toString(16).slice(2)}`, { state: 'done', percent: 100, message: 'Export complete' });

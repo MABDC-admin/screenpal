@@ -695,7 +695,8 @@ function selectProject(id) {
   const engine = activeProject.capture?.engine || activeProject.media?.engine || 'browser';
   const audio = activeProject.capture?.audioDevice ? ` · audio: ${activeProject.capture.audioDevice}` : ' · no audio source';
   const kind = isImageProject(activeProject) ? 'screenshot' : engine;
-  setStatus(`${formatDuration(activeProject.durationMs)} · ${formatSize(activeProject.sizeBytes)} · ${kind}${isImageProject(activeProject) ? '' : audio}`);
+  const imageCompression = activeProject.media?.compression?.codec ? ` · ${activeProject.media.compression.codec}` : '';
+  setStatus(`${formatDuration(activeProject.durationMs)} · ${formatSize(activeProject.sizeBytes)} · ${kind}${isImageProject(activeProject) ? imageCompression : audio}`);
   preview.srcObject = null;
   if (isImageProject(activeProject)) {
     preview.pause();
@@ -1221,10 +1222,11 @@ async function stopRecording() {
           width: screenshot.media?.width,
           height: screenshot.media?.height,
           engine: screenshot.media?.engine,
+          compression: screenshot.media?.compression || null,
           bytes: screenshot.sizeBytes,
           uploadVisible: uploadProject.getBoundingClientRect().width > 40 && !uploadProject.disabled
         };
-        if (!screenshotPreview.visible || screenshotPreview.mimeType !== 'image/png' || screenshotPreview.bytes <= 0 || screenshotPreview.width < 7680 || !screenshotPreview.engine?.startsWith('ffmpeg-')) {
+        if (!screenshotPreview.visible || !screenshotPreview.mimeType?.startsWith('image/') || screenshotPreview.bytes <= 0 || screenshotPreview.width < 7680 || !screenshotPreview.engine?.startsWith('ffmpeg-') || !screenshotPreview.compression?.enabled || screenshotPreview.compression.compressedSizeBytes > screenshotPreview.compression.originalSizeBytes) {
           throw new Error(`Screenshot project did not preview correctly: ${JSON.stringify(screenshotPreview)}`);
         }
         await window.screenStudio.hideForScreenshot();
@@ -1243,10 +1245,11 @@ async function stopRecording() {
           width: regionScreenshot.media?.width,
           height: regionScreenshot.media?.height,
           engine: regionScreenshot.media?.engine,
+          compression: regionScreenshot.media?.compression || null,
           bytes: regionScreenshot.sizeBytes
         };
-        if (regionScreenshotPreview.mimeType !== 'image/png' || regionScreenshotPreview.bytes <= 0 || regionScreenshotPreview.width < 7680 || !regionScreenshotPreview.engine?.startsWith('ffmpeg-')) {
-          throw new Error(`Region screenshot did not save as 8K PNG: ${JSON.stringify(regionScreenshotPreview)}`);
+        if (!regionScreenshotPreview.mimeType?.startsWith('image/') || regionScreenshotPreview.bytes <= 0 || regionScreenshotPreview.width < 7680 || !regionScreenshotPreview.engine?.startsWith('ffmpeg-') || !regionScreenshotPreview.compression?.enabled || regionScreenshotPreview.compression.compressedSizeBytes > regionScreenshotPreview.compression.originalSizeBytes) {
+          throw new Error(`Region screenshot did not save as compressed 8K image: ${JSON.stringify(regionScreenshotPreview)}`);
         }
         await window.screenStudio.completeSelfTest({
           ok: true,
