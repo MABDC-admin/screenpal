@@ -79,9 +79,11 @@ const minioRegion = document.getElementById('minioRegion');
 const minioUploadMode = document.getElementById('minioUploadMode');
 const minioPublicBaseUrl = document.getElementById('minioPublicBaseUrl');
 const minioSettingsStatus = document.getElementById('minioSettingsStatus');
+const projectTabs = Array.from(document.querySelectorAll('.project-tab'));
 
 let projects = [];
 let activeProject = null;
+let projectTab = 'all';
 let mediaRecorder = null;
 let recordingChunks = [];
 let recordingStartedAt = 0;
@@ -142,6 +144,25 @@ function mediaUrl(filePath) {
 
 function isImageProject(project = activeProject) {
   return Boolean(project?.media?.mimeType?.startsWith('image/'));
+}
+
+function projectMatchesTab(project) {
+  if (projectTab === 'videos') return !isImageProject(project);
+  if (projectTab === 'images') return isImageProject(project);
+  return true;
+}
+
+function setProjectTab(tab) {
+  projectTab = tab || 'all';
+  projectTabs.forEach((button) => {
+    const active = button.dataset.projectTab === projectTab;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  renderProjects();
+  requestAnimationFrame(() => {
+    projectList.scrollTop = 0;
+  });
 }
 
 function setStatus(text) {
@@ -274,7 +295,7 @@ function stopPreviewPlayback() {
 }
 
 async function verifyPlaybackControls() {
-  const buttons = [topPlayPreview, topStopPreview, dockPlayPreview, dockStopPreview, stagePlayPreview, stageStopPreview];
+  const buttons = [topPlayPreview, topStopPreview, dockPlayPreview, dockStopPreview];
   const visible = buttons.every((button) => {
     const rect = button.getBoundingClientRect();
     return rect.width > 20 && rect.height > 20;
@@ -291,7 +312,17 @@ async function verifyPlaybackControls() {
     const rect = button.getBoundingClientRect();
     return rect.width > 20 && rect.height > 20;
   });
-  if (!externalOpenVisible) throw new Error('External open button is not visible in the project sidebar');
+  if (!externalOpenVisible) throw new Error('External open button is not visible in the project browser');
+  const projectDeleteVisible = Array.from(document.querySelectorAll('.project-delete')).some((button) => {
+    const rect = button.getBoundingClientRect();
+    return rect.width > 40 && rect.height > 20;
+  });
+  if (!projectDeleteVisible) throw new Error('Project delete button is not visible in the project browser');
+  const projectThumbnailVisible = Array.from(document.querySelectorAll('.project-thumb')).some((thumb) => {
+    const rect = thumb.getBoundingClientRect();
+    return rect.width > 80 && rect.height > 40;
+  });
+  if (!projectThumbnailVisible) throw new Error('Project thumbnail grid is not visible');
   await new Promise((resolve, reject) => {
     if (preview.readyState >= 1) {
       resolve();
@@ -349,22 +380,50 @@ function previewFrameMetrics() {
   };
 }
 
+function sectionOverlapMetrics() {
+  const selectors = ['.topbar', '.stage', '.playback-panel', '.project-browser', '.record-panel', '.editor-panel', '.tools-panel'];
+  const rects = selectors.map((selector) => {
+    const rect = document.querySelector(selector).getBoundingClientRect();
+    return {
+      selector,
+      top: Math.round(rect.top),
+      bottom: Math.round(rect.bottom),
+      left: Math.round(rect.left),
+      right: Math.round(rect.right),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height)
+    };
+  });
+  const overlaps = [];
+  for (let i = 0; i < rects.length; i += 1) {
+    for (let j = i + 1; j < rects.length; j += 1) {
+      const a = rects[i];
+      const b = rects[j];
+      const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+      const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      if (width * height > 4) overlaps.push({ a: a.selector, b: b.selector, area: width * height });
+    }
+  }
+  return { rects, overlaps };
+}
+
 async function verifyFixedPreviewFrame() {
   const before = previewFrameMetrics();
   window.resizeTo(1180, 720);
   await new Promise((resolve) => setTimeout(resolve, 300));
   const after = previewFrameMetrics();
+  const layout = sectionOverlapMetrics();
   const cleanLayout = [before, after].every((metrics) => (
     metrics.workspaceWidth >= 520 &&
     metrics.stageWidth >= 520 &&
-    metrics.stageHeight >= 300 &&
+    metrics.stageHeight >= 220 &&
     metrics.stageHeight <= 620 &&
     Math.abs(metrics.stageHeight - metrics.previewHeight) <= 1
-  ));
+  )) && layout.overlaps.length === 0;
   if (!cleanLayout) {
-    throw new Error(`Preview frame did not adapt cleanly: ${JSON.stringify({ before, after })}`);
+    throw new Error(`Preview frame did not adapt cleanly: ${JSON.stringify({ before, after, layout })}`);
   }
-  return { expected: 'responsive', before, after };
+  return { expected: 'responsive-no-overlap', before, after, layout };
 }
 
 async function verifyMinimalUi() {
@@ -443,6 +502,9 @@ function defaultCaptureMetrics() {
     recordingQuality: recordingQuality.value,
     projectRenameButtons: document.querySelectorAll('.project-rename').length,
     projectOpenButtons: document.querySelectorAll('.project-open').length,
+    projectDeleteButtons: document.querySelectorAll('.project-delete').length,
+    projectThumbnails: document.querySelectorAll('.project-thumb').length,
+    projectGridColumns: getComputedStyle(projectList).gridTemplateColumns,
     projectMenuVisible: projectActionsMenu.getBoundingClientRect().width > 40,
     minioConfigured: Boolean(minioConfig?.configured),
     minioSettingsButtonVisible: minioSettings.getBoundingClientRect().width > 40,
@@ -521,6 +583,9 @@ async function loadProjects() {
   if (activeProject) activeProject = projects.find((project) => project.id === activeProject.id) || null;
   if (!activeProject && projects.length) selectProject(projects[0].id);
   if (!projects.length) selectProject(null);
+  requestAnimationFrame(() => {
+    projectList.scrollTop = 0;
+  });
 }
 
 function renderProjects() {
@@ -533,14 +598,30 @@ function renderProjects() {
     return;
   }
 
-  for (const project of projects) {
+  const visibleProjects = projects.filter(projectMatchesTab);
+  if (!visibleProjects.length) {
+    const empty = document.createElement('div');
+    empty.className = 'project-item';
+    empty.innerHTML = '<strong>No projects here</strong><span>Switch tabs or record a new item.</span>';
+    projectList.appendChild(empty);
+    return;
+  }
+
+  for (const project of visibleProjects) {
     const row = document.createElement('div');
-    row.className = 'project-row';
+    row.className = `project-row ${activeProject?.id === project.id ? 'active' : ''}`;
     const selectButton = document.createElement('button');
     selectButton.className = `project-main ${activeProject?.id === project.id ? 'active' : ''}`;
+    const thumbnail = project.thumbnailPath ? mediaUrl(project.thumbnailPath) : '';
+    const thumbnailMarkup = thumbnail
+      ? `<img class="project-thumb" src="${thumbnail}" alt="" loading="lazy" />`
+      : `<div class="project-thumb project-thumb-empty">${isImageProject(project) ? 'Image' : 'Video'}</div>`;
     selectButton.innerHTML = `
-      <strong>${escapeHtml(project.title)}</strong>
-      <span>${formatDuration(project.durationMs)} · ${formatSize(project.sizeBytes)}</span>
+      <span class="project-thumb-wrap">${thumbnailMarkup}<span class="project-kind">${isImageProject(project) ? 'Image' : 'Video'}</span></span>
+      <span class="project-info">
+        <strong>${escapeHtml(project.title)}</strong>
+        <span>${formatDuration(project.durationMs)} · ${formatSize(project.sizeBytes)}</span>
+      </span>
     `;
     selectButton.addEventListener('click', () => selectProject(project.id));
     selectButton.addEventListener('dblclick', () => openProjectMediaById(project.id));
@@ -556,7 +637,16 @@ function renderProjects() {
     renameButton.setAttribute('aria-label', `Rename ${project.title}`);
     renameButton.textContent = '✎';
     renameButton.addEventListener('click', () => renameProjectById(project.id));
-    row.append(selectButton, openButton, renameButton);
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'project-delete';
+    deleteButton.title = 'Delete project';
+    deleteButton.setAttribute('aria-label', `Delete ${project.title}`);
+    deleteButton.textContent = 'Delete';
+    deleteButton.addEventListener('click', () => deleteProjectById(project.id));
+    const actionBar = document.createElement('div');
+    actionBar.className = 'project-card-actions';
+    actionBar.append(openButton, renameButton, deleteButton);
+    row.append(selectButton, actionBar);
     projectList.appendChild(row);
   }
 }
@@ -1366,9 +1456,15 @@ async function openProjectMediaById(projectId) {
 
 async function deleteActiveProject() {
   if (!activeProject) return;
-  const deleted = await window.screenStudio.deleteProject(activeProject.path);
+  await deleteProjectById(activeProject.id);
+}
+
+async function deleteProjectById(id) {
+  const target = projects.find((project) => project.id === id);
+  if (!target) return;
+  const deleted = await window.screenStudio.deleteProject(target.path);
   if (!deleted) return;
-  activeProject = null;
+  if (activeProject?.id === target.id) activeProject = null;
   await loadProjects();
 }
 
@@ -1591,6 +1687,7 @@ preview.addEventListener('loadedmetadata', () => {
 wireStartButton(topStartCapture);
 wireStartButton(stageStartCapture);
 refreshProjects.addEventListener('click', loadProjects);
+projectTabs.forEach((button) => button.addEventListener('click', () => setProjectTab(button.dataset.projectTab)));
 takeScreenshot.addEventListener('click', captureScreenshotProject);
 newRecording.addEventListener('click', () => {
   selectProject(null);

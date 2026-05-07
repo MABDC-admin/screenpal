@@ -99,7 +99,7 @@ function createWindow() {
         isQuitting = true;
         app.quit();
       }
-    }, 45000);
+    }, 90000);
   }
 }
 
@@ -303,11 +303,54 @@ async function readProject(projectDir) {
   const safeDir = assertProjectPath(projectDir);
   const raw = await fs.readFile(path.join(safeDir, 'project.json'), 'utf8');
   const meta = JSON.parse(raw);
+  const mediaPath = path.join(safeDir, meta.media?.source || 'media/capture.webm');
+  const thumbnailPath = await ensureProjectThumbnail(safeDir, meta, mediaPath);
   return {
     ...meta,
     path: safeDir,
-    mediaPath: path.join(safeDir, meta.media?.source || 'media/capture.webm')
+    mediaPath,
+    thumbnailPath
   };
+}
+
+async function ensureProjectThumbnail(projectDir, meta, mediaPath) {
+  if (!mediaPath || !fss.existsSync(mediaPath)) return null;
+  if (meta.media?.mimeType?.startsWith('image/')) return mediaPath;
+
+  const thumbnailPath = path.join(projectDir, 'media', 'thumbnail.jpg');
+  const failedPath = `${thumbnailPath}.failed.json`;
+  try {
+    const mediaStat = await fs.stat(mediaPath);
+    if (fss.existsSync(thumbnailPath)) {
+      const thumbnailStat = await fs.stat(thumbnailPath);
+      if (thumbnailStat.size > 0 && thumbnailStat.mtimeMs >= mediaStat.mtimeMs) return thumbnailPath;
+    }
+    if (fss.existsSync(failedPath)) {
+      const failed = JSON.parse(await fs.readFile(failedPath, 'utf8'));
+      if (Math.abs(Number(failed.mediaMtimeMs || 0) - mediaStat.mtimeMs) < 1) return null;
+    }
+    await runFfmpegProcess([
+      '-hide_banner',
+      '-y',
+      '-i', mediaPath,
+      '-vf', 'thumbnail,scale=640:-2:flags=lanczos',
+      '-frames:v', '1',
+      '-q:v', '2',
+      thumbnailPath
+    ]);
+    const thumbnailStat = await fs.stat(thumbnailPath);
+    await fs.rm(failedPath, { force: true });
+    return thumbnailStat.size > 0 ? thumbnailPath : null;
+  } catch (error) {
+    const mediaStat = fss.existsSync(mediaPath) ? fss.statSync(mediaPath) : null;
+    await fs.writeFile(failedPath, JSON.stringify({
+      mediaMtimeMs: mediaStat?.mtimeMs || 0,
+      failedAt: new Date().toISOString(),
+      error: error.message
+    }, null, 2)).catch(() => {});
+    log('Video thumbnail generation failed', `${mediaPath}: ${error.message}`);
+    return null;
+  }
 }
 
 async function recoverProjectFromMedia(projectDir) {

@@ -68,11 +68,6 @@
           </label>
         </div>
 
-        <div class="library-head">
-          <h2>Projects</h2>
-          <button id="refreshProjects" class="icon-button" title="Refresh">↻</button>
-        </div>
-        <div id="projectList" class="project-list"></div>
       </aside>
 
       <main class="workspace">
@@ -117,18 +112,19 @@
             <strong>No project selected</strong>
             <span>Start a recording or select a saved project.</span>
           </div>
-          <div class="stage-transport">
-            <div class="transport-group">
-              <span>Video Playback</span>
-              <button id="stagePlayPreview" class="secondary-action" disabled>Play</button>
-              <button id="stageStopPreview" class="secondary-action" disabled>Stop Video</button>
-              <button id="stageRenameProject" class="secondary-action" disabled>Rename Video</button>
-            </div>
-            <div class="transport-group">
-              <span>Recording</span>
-              <button id="stageStartCapture" class="primary-action">Record</button>
-              <button id="stageStopCapture" class="danger-action" disabled>Stop Rec</button>
-            </div>
+        </section>
+
+        <section class="stage-actions" aria-label="Main transport controls">
+          <div class="transport-group">
+            <span>Video Playback</span>
+            <button id="stagePlayPreview" class="secondary-action" disabled>Play</button>
+            <button id="stageStopPreview" class="secondary-action" disabled>Stop Video</button>
+            <button id="stageRenameProject" class="secondary-action" disabled>Rename Video</button>
+          </div>
+          <div class="transport-group">
+            <span>Recording</span>
+            <button id="stageStartCapture" class="primary-action">Record</button>
+            <button id="stageStopCapture" class="danger-action" disabled>Stop Rec</button>
           </div>
         </section>
 
@@ -144,6 +140,18 @@
             <button id="dockStopPreview" class="secondary-action" disabled>Stop Video</button>
             <button id="dockRenameProject" class="secondary-action" disabled>Rename Video</button>
           </div>
+        </section>
+
+        <section class="project-browser" aria-label="Project browser">
+          <div class="project-browser-head">
+            <div class="project-tabs" role="tablist" aria-label="Project filters">
+              <button class="project-tab active" type="button" role="tab" aria-selected="true" data-project-tab="all">All</button>
+              <button class="project-tab" type="button" role="tab" aria-selected="false" data-project-tab="videos">Videos</button>
+              <button class="project-tab" type="button" role="tab" aria-selected="false" data-project-tab="images">Images</button>
+            </div>
+            <button id="refreshProjects" class="icon-button" title="Refresh projects">↻</button>
+          </div>
+          <div id="projectList" class="project-list project-grid"></div>
         </section>
 
         <section class="record-panel" id="recordPanel">
