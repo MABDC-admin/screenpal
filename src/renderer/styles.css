@@ -40,26 +40,26 @@ body {
 
 body.dark-theme {
   color-scheme: dark;
-  --surface: #141b24;
-  --surface-soft: #101720;
-  --surface-tint: #102b33;
-  --line: #273445;
-  --line-strong: #3a4a5f;
-  --ink: #eef4fb;
-  --muted: #a8b5c6;
-  --subtle: #738397;
-  --teal: #35a6ba;
-  --teal-dark: #67d3df;
-  --green: #4bbf91;
-  --amber: #d79a32;
-  --red: #e1745d;
-  --red-dark: #ff9a86;
-  --shadow-sm: 0 8px 22px rgba(0, 0, 0, 0.24);
-  --shadow-md: 0 20px 48px rgba(0, 0, 0, 0.32);
-  --shadow-lg: 0 28px 78px rgba(0, 0, 0, 0.38);
+  --surface: #171a1f;
+  --surface-soft: #111419;
+  --surface-tint: #10282c;
+  --line: #2c333b;
+  --line-strong: #414a55;
+  --ink: #f2f5f7;
+  --muted: #b8c1cc;
+  --subtle: #7f8a98;
+  --teal: #38a9b8;
+  --teal-dark: #7fd8df;
+  --green: #55c090;
+  --amber: #e0a447;
+  --red: #e88370;
+  --red-dark: #ffad9d;
+  --shadow-sm: 0 10px 28px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 22px 54px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 32px 86px rgba(0, 0, 0, 0.48);
   background:
-    linear-gradient(90deg, rgba(53, 166, 186, 0.12), transparent 28%),
-    linear-gradient(180deg, #101720 0%, #0c121a 100%);
+    linear-gradient(90deg, rgba(56, 169, 184, 0.12), transparent 30%),
+    linear-gradient(180deg, #14171c 0%, #0d1014 100%);
 }
 
 body.mini-mode {
@@ -77,14 +77,16 @@ body.dark-theme .job-panel,
 body.dark-theme .project-browser-head,
 body.dark-theme .dialog-backdrop .text-dialog,
 body.dark-theme .minio-card {
-  background: rgba(20, 27, 36, 0.96);
+  background: rgba(23, 26, 31, 0.96);
   border-color: var(--line);
   color: var(--ink);
-  box-shadow: none;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.035), 0 16px 38px rgba(0, 0, 0, 0.2);
 }
 
 body.dark-theme .workspace {
-  background: linear-gradient(180deg, rgba(20, 27, 36, 0.5) 0%, rgba(12, 18, 26, 0.34) 100%);
+  background:
+    linear-gradient(180deg, rgba(18, 21, 26, 0.88) 0%, rgba(12, 15, 19, 0.96) 100%),
+    radial-gradient(circle at 82% 0%, rgba(56, 169, 184, 0.12), transparent 34%);
 }
 
 body.dark-theme .brand,
@@ -94,6 +96,7 @@ body.dark-theme .project-browser-head {
 
 body.dark-theme .brand h1,
 body.dark-theme .topbar h2,
+body.dark-theme #activeMeta,
 body.dark-theme .project-info strong,
 body.dark-theme label,
 body.dark-theme .panel-label,
@@ -105,7 +108,7 @@ body.dark-theme .project-tab.active {
 
 body.dark-theme .brand-mark {
   background: #ffffff;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.38);
 }
 
 body.dark-theme .secondary-action,
@@ -118,16 +121,30 @@ body.dark-theme .project-tab,
 body.dark-theme .project-more,
 body.dark-theme input,
 body.dark-theme select {
-  background: #101720;
+  background: linear-gradient(180deg, #20252c 0%, #171b21 100%);
   border-color: var(--line-strong);
   color: var(--ink);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+body.dark-theme .secondary-action:disabled,
+body.dark-theme .danger-action:disabled,
+body.dark-theme .primary-action:disabled,
+body.dark-theme input:disabled,
+body.dark-theme select:disabled {
+  background: #15191f;
+  border-color: #2a3038;
+  color: #6e7987;
+  box-shadow: none;
 }
 
 body.dark-theme .secondary-action:not(:disabled):hover,
+body.dark-theme .icon-button:not(:disabled):hover,
 body.dark-theme .menu-action:not(:disabled):hover,
 body.dark-theme .project-tab.active,
 body.dark-theme .project-more:hover {
-  background: #12323b;
+  background: linear-gradient(180deg, #173a40 0%, #12272d 100%);
+  border-color: rgba(127, 216, 223, 0.42);
   color: var(--teal-dark);
 }
 
@@ -136,28 +153,107 @@ body.dark-theme .action-menu-panel,
 body.dark-theme .project-row,
 body.dark-theme .project-main,
 body.dark-theme .project-item {
-  background: rgba(16, 23, 32, 0.96);
+  background: rgba(18, 21, 26, 0.96);
   border-color: var(--line);
   color: var(--ink);
 }
 
+body.dark-theme .action-cluster {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+body.dark-theme .action-menu-panel {
+  box-shadow: var(--shadow-md);
+}
+
 body.dark-theme .project-row.active .project-main,
 body.dark-theme .project-main.active {
-  background: linear-gradient(180deg, #12323b 0%, #101720 100%);
-  box-shadow: inset 0 0 0 2px rgba(53, 166, 186, 0.34);
+  background: linear-gradient(180deg, rgba(22, 58, 64, 0.98) 0%, rgba(18, 25, 31, 0.98) 100%);
+  box-shadow: inset 0 0 0 2px rgba(127, 216, 223, 0.34);
+}
+
+body.dark-theme .project-row {
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.2);
 }
 
 body.dark-theme .project-main:not(.active):hover {
-  background: #172332;
+  background: #1d232b;
+}
+
+body.dark-theme .stage {
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    radial-gradient(circle at 50% 0%, #202731 0%, #10151c 48%, #080b0f 100%);
+  background-size: 28px 28px, 28px 28px, auto;
+}
+
+body.dark-theme #preview,
+body.dark-theme #imagePreview {
+  background: #080b0f;
+}
+
+body.dark-theme .playback-timeline span,
+body.dark-theme .project-info > span,
+body.dark-theme .project-item span,
+body.dark-theme .settings-head p,
+body.dark-theme .empty-state {
+  color: var(--muted);
+}
+
+body.dark-theme .record-status,
+body.dark-theme .health-strip span,
+body.dark-theme .settings-status {
+  background: #12161c;
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+body.dark-theme .settings-dialog {
+  background: #171a1f;
+  border-color: var(--line);
+  box-shadow: var(--shadow-lg);
+}
+
+body.dark-theme .settings-head h2 {
+  color: var(--ink);
+}
+
+body.dark-theme .stage-actions,
+body.dark-theme .editor-panel,
+body.dark-theme .tools-panel {
+  background: rgba(20, 23, 28, 0.96);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+body.dark-theme .stage-actions .transport-group span,
+body.dark-theme .library-head h2 {
+  color: var(--muted);
+}
+
+body.dark-theme .project-browser {
+  background: linear-gradient(180deg, #171a1f 0%, #12161c 100%);
+}
+
+body.dark-theme .project-tab {
+  background: #161a20;
+  color: var(--muted);
+}
+
+body.dark-theme .project-tab.active {
+  background: linear-gradient(180deg, #14363d 0%, #101f24 100%);
+  color: var(--teal-dark);
+  box-shadow: inset 0 0 0 1px rgba(127, 216, 223, 0.2);
 }
 
 body.dark-theme .project-resize-handle::before {
-  background: #334258;
+  background: #343b45;
 }
 
 body.dark-theme .project-resize-handle::after {
-  background: #5c6e84;
-  box-shadow: 0 0 0 4px rgba(20, 27, 36, 0.94);
+  background: #606b78;
+  box-shadow: 0 0 0 4px rgba(23, 26, 31, 0.94);
 }
 
 body.dark-theme .project-thumb-empty,
