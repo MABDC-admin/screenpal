@@ -93,8 +93,8 @@
                 <button id="renameProject" class="menu-action" type="button" disabled>Rename Video</button>
                 <button id="openFolder" class="menu-action" type="button">Open Folder</button>
                 <button id="exportProject" class="menu-action" type="button" disabled>Export Video</button>
-                <button id="uploadProject" class="menu-action" type="button" disabled>Upload to MinIO</button>
-                <button id="minioSettings" class="menu-action" type="button">MinIO Settings</button>
+                <button id="uploadProject" class="menu-action" type="button" disabled>Upload to Cloud</button>
+                <button id="minioSettings" class="menu-action" type="button">Cloud Settings</button>
                 <button id="deleteProject" class="menu-action warning-action" type="button" disabled>Delete Project</button>
               </div>
             </details>
@@ -166,7 +166,7 @@
             <span id="healthEncoder">Encoder: checking</span>
             <span id="healthAudio">Audio: checking</span>
             <span id="healthFfmpeg">FFmpeg: checking</span>
-            <span id="healthMinio">MinIO: checking</span>
+            <span id="healthMinio">Cloud: checking</span>
           </div>
           <div class="record-controls">
             <button id="startCapture" class="primary-action">Start Capture</button>
@@ -223,7 +223,7 @@
           <form id="minioForm" class="settings-dialog">
             <div class="settings-head">
               <div>
-                <h2>MinIO Settings</h2>
+                <h2>Cloud Storage Settings</h2>
                 <p>Saved locally on this PC for uploads.</p>
               </div>
               <button id="closeMinioSettings" class="icon-button" type="button" title="Close">×</button>

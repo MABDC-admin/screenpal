@@ -371,6 +371,220 @@ function askTextDialog({ title, label, initialValue = '', inputType = 'text', al
   });
 }
 
+function showPostRecordDialog(project, options = {}) {
+  if (!project || (selfTestMode && !options.test)) return null;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'dialog-backdrop';
+
+  const dialog = document.createElement('section');
+  dialog.className = 'text-dialog post-record-dialog';
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', 'postRecordTitle');
+
+  const title = document.createElement('h2');
+  title.id = 'postRecordTitle';
+  title.textContent = 'Recording Saved';
+
+  const summary = document.createElement('div');
+  summary.className = 'record-save-summary';
+
+  const summaryTitle = document.createElement('strong');
+  summaryTitle.textContent = project.title;
+
+  const summaryMeta = document.createElement('span');
+  summaryMeta.textContent = `${formatDuration(project.durationMs || 0)} · ${formatSize(project.sizeBytes || 0)}`;
+
+  const summaryAutosave = document.createElement('small');
+  summaryAutosave.textContent = 'Realtime autosave is already active: the recorder writes a crash-safe working MKV while recording, then finalizes the MP4 when you stop.';
+
+  summary.append(summaryTitle, summaryMeta, summaryAutosave);
+
+  const primaryActions = document.createElement('div');
+  primaryActions.className = 'post-record-actions';
+
+  const exportButton = document.createElement('button');
+  exportButton.type = 'button';
+  exportButton.className = 'primary-action';
+  exportButton.textContent = 'Export / Save Local';
+
+  const uploadButton = document.createElement('button');
+  uploadButton.type = 'button';
+  uploadButton.className = 'secondary-action';
+  uploadButton.textContent = 'Upload to Cloud';
+
+  const openButton = document.createElement('button');
+  openButton.type = 'button';
+  openButton.className = 'secondary-action';
+  openButton.textContent = 'Open Video';
+
+  const folderButton = document.createElement('button');
+  folderButton.type = 'button';
+  folderButton.className = 'secondary-action';
+  folderButton.textContent = 'Open Folder';
+
+  const closeRow = document.createElement('div');
+  closeRow.className = 'dialog-actions';
+
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'secondary-action';
+  closeButton.textContent = 'Close';
+
+  function close() {
+    document.removeEventListener('keydown', onKeyDown);
+    backdrop.remove();
+  }
+
+  function onKeyDown(event) {
+    if (event.key === 'Escape') close();
+  }
+
+  exportButton.addEventListener('click', async () => {
+    await exportProjectByProject(project);
+  });
+  uploadButton.addEventListener('click', async () => {
+    await uploadProjectByProject(project);
+  });
+  openButton.addEventListener('click', async () => {
+    await window.screenStudio.openMedia(project.path).catch((error) => {
+      showJob(error.message || 'Open video failed', 0, 'error');
+    });
+  });
+  folderButton.addEventListener('click', async () => {
+    await window.screenStudio.openFolder(project.path).catch((error) => {
+      showJob(error.message || 'Open folder failed', 0, 'error');
+    });
+  });
+  closeButton.addEventListener('click', close);
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) close();
+  });
+  document.addEventListener('keydown', onKeyDown);
+
+  primaryActions.append(exportButton, uploadButton, openButton, folderButton);
+  closeRow.appendChild(closeButton);
+  dialog.append(title, summary, primaryActions, closeRow);
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+  exportButton.focus();
+  return backdrop;
+}
+
+function showCloudUploadDialog(uploaded, project, options = {}) {
+  if (!uploaded?.url || (selfTestMode && !options.test)) return null;
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'dialog-backdrop';
+
+  const dialog = document.createElement('section');
+  dialog.className = 'text-dialog cloud-upload-dialog';
+  dialog.setAttribute('role', 'dialog');
+  dialog.setAttribute('aria-modal', 'true');
+  dialog.setAttribute('aria-labelledby', 'cloudUploadTitle');
+
+  const title = document.createElement('h2');
+  title.id = 'cloudUploadTitle';
+  title.textContent = 'Cloud Link Ready';
+
+  const summary = document.createElement('div');
+  summary.className = 'record-save-summary cloud-upload-summary';
+
+  const summaryTitle = document.createElement('strong');
+  summaryTitle.textContent = project?.title || 'Uploaded project';
+
+  const summaryMeta = document.createElement('span');
+  summaryMeta.textContent = `${uploaded.bucket || 'Cloud'} · ${formatSize(uploaded.sizeBytes || project?.sizeBytes || 0)}`;
+
+  const urlLabel = document.createElement('label');
+  urlLabel.className = 'cloud-url-label';
+  urlLabel.textContent = 'Preview and download URL';
+
+  const urlInput = document.createElement('input');
+  urlInput.className = 'cloud-url-input';
+  urlInput.type = 'url';
+  urlInput.readOnly = true;
+  urlInput.value = uploaded.url;
+  urlInput.setAttribute('aria-label', 'Cloud preview and download URL');
+
+  urlLabel.appendChild(urlInput);
+  summary.append(summaryTitle, summaryMeta, urlLabel);
+
+  const actions = document.createElement('div');
+  actions.className = 'cloud-url-actions';
+
+  const previewButton = document.createElement('button');
+  previewButton.type = 'button';
+  previewButton.className = 'primary-action';
+  previewButton.textContent = 'Preview';
+
+  const downloadButton = document.createElement('button');
+  downloadButton.type = 'button';
+  downloadButton.className = 'secondary-action';
+  downloadButton.textContent = 'Download';
+
+  const copyButton = document.createElement('button');
+  copyButton.type = 'button';
+  copyButton.className = 'secondary-action';
+  copyButton.textContent = 'Copy URL';
+
+  const closeButton = document.createElement('button');
+  closeButton.type = 'button';
+  closeButton.className = 'secondary-action';
+  closeButton.textContent = 'Close';
+
+  function close() {
+    document.removeEventListener('keydown', onKeyDown);
+    backdrop.remove();
+  }
+
+  function onKeyDown(event) {
+    if (event.key === 'Escape') close();
+  }
+
+  previewButton.addEventListener('click', async () => {
+    await window.screenStudio.openExternalUrl(uploaded.url).catch((error) => {
+      showJob(error.message || 'Unable to open Cloud preview', 0, 'error');
+    });
+  });
+  downloadButton.addEventListener('click', async () => {
+    await window.screenStudio.downloadUrl(uploaded.url).then(() => {
+      showJob('Cloud download started', 100, 'done');
+      hideJobSoon();
+    }).catch(async (error) => {
+      await window.screenStudio.openExternalUrl(uploaded.url).catch(() => {
+        showJob(error.message || 'Unable to download Cloud file', 0, 'error');
+      });
+    });
+  });
+  copyButton.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(uploaded.url);
+      showJob('Cloud URL copied', 100, 'done');
+      hideJobSoon();
+    } catch {
+      urlInput.focus();
+      urlInput.select();
+      showJob('Cloud URL selected', 100, 'done');
+      hideJobSoon();
+    }
+  });
+  closeButton.addEventListener('click', close);
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) close();
+  });
+  document.addEventListener('keydown', onKeyDown);
+
+  actions.append(previewButton, downloadButton, copyButton, closeButton);
+  dialog.append(title, summary, actions);
+  backdrop.appendChild(dialog);
+  document.body.appendChild(backdrop);
+  urlInput.focus();
+  urlInput.select();
+  return backdrop;
+}
+
 function hideCountdownOverlay() {
   countdownOverlay.hidden = true;
   countdownOverlay.textContent = '';
@@ -666,7 +880,41 @@ async function verifyMinioSettingsDialog() {
   };
   closeMinioSettingsDialog();
   if (!result.visible || !result.endpointPresent || !result.bucketPresent || !result.testButtonVisible || !result.saveButtonVisible) {
-    throw new Error(`MinIO settings dialog is not usable: ${JSON.stringify(result)}`);
+    throw new Error(`Cloud settings dialog is not usable: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
+async function verifyPostRecordDialog(project) {
+  const dialog = showPostRecordDialog(project, { test: true });
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  const actions = Array.from(dialog.querySelectorAll('.post-record-actions button')).map((button) => button.textContent);
+  const summary = dialog.querySelector('.record-save-summary');
+  const result = {
+    visible: dialog.querySelector('.post-record-dialog')?.getBoundingClientRect().width > 400,
+    actions,
+    hasRealtimeAutosaveText: /Realtime autosave/i.test(summary?.textContent || '')
+  };
+  dialog.querySelector('.dialog-actions button')?.click();
+  if (!result.visible || !actions.includes('Export / Save Local') || !actions.includes('Upload to Cloud') || !actions.includes('Open Video') || !actions.includes('Open Folder') || !result.hasRealtimeAutosaveText) {
+    throw new Error(`Post-record dialog is not usable: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
+async function verifyCloudUploadDialog(upload, project) {
+  const dialog = showCloudUploadDialog(upload, project, { test: true });
+  await new Promise((resolve) => setTimeout(resolve, 120));
+  const actions = Array.from(dialog.querySelectorAll('.cloud-url-actions button')).map((button) => button.textContent);
+  const urlInput = dialog.querySelector('.cloud-url-input');
+  const result = {
+    visible: dialog.querySelector('.cloud-upload-dialog')?.getBoundingClientRect().width > 440,
+    actions,
+    url: urlInput?.value || ''
+  };
+  actions.includes('Close') && Array.from(dialog.querySelectorAll('.cloud-url-actions button')).find((button) => button.textContent === 'Close')?.click();
+  if (!result.visible || !result.url.startsWith('http') || !actions.includes('Preview') || !actions.includes('Download') || !actions.includes('Copy URL')) {
+    throw new Error(`Cloud upload dialog is not usable: ${JSON.stringify(result)}`);
   }
   return result;
 }
@@ -731,12 +979,12 @@ async function refreshDiagnostics() {
     healthEncoder.textContent = `Encoder: ${pipeline.encoder || 'detecting'}`;
     healthAudio.textContent = `Audio: ${diagnostics.audioDevices?.length ? 'device ready' : 'loopback/default'}`;
     healthFfmpeg.textContent = diagnostics.ffmpegAvailable ? 'FFmpeg: ready' : 'FFmpeg: missing';
-    healthMinio.textContent = minioConfig?.configured ? `MinIO: ${minioConfig.bucket}` : 'MinIO: setup needed';
+    healthMinio.textContent = minioConfig?.configured ? `Cloud: ${minioConfig.bucket}` : 'Cloud: setup needed';
   } catch {
     healthEncoder.textContent = 'Encoder: unknown';
     healthAudio.textContent = 'Audio: unknown';
     healthFfmpeg.textContent = 'FFmpeg: unknown';
-    healthMinio.textContent = minioConfig?.configured ? `MinIO: ${minioConfig.bucket}` : 'MinIO: setup needed';
+    healthMinio.textContent = minioConfig?.configured ? `Cloud: ${minioConfig.bucket}` : 'Cloud: setup needed';
   }
 }
 
@@ -1403,6 +1651,7 @@ async function stopRecording() {
       activeProject = project;
       selectProject(project.id);
       loadDevices();
+      if (!selfTestMode) showPostRecordDialog(project);
       if (selfTestMode) {
         const renamedProject = await window.screenStudio.renameProject({
           path: project.path,
@@ -1411,6 +1660,7 @@ async function stopRecording() {
         projects = (await window.screenStudio.listProjects()).map((item) => item.id === renamedProject.id ? renamedProject : item);
         activeProject = renamedProject;
         selectProject(renamedProject.id);
+        const postRecordDialog = await verifyPostRecordDialog(renamedProject);
         const fixedPreviewFrame = await verifyFixedPreviewFrame();
         const projectBrowserResize = await verifyProjectBrowserResize();
         const darkTheme = await verifyThemeToggle();
@@ -1418,6 +1668,7 @@ async function stopRecording() {
         const minioSettingsDialog = await verifyMinioSettingsDialog();
         const playback = await verifyPlaybackControls();
         const upload = minioConfig?.configured ? await window.screenStudio.uploadProject(renamedProject.path) : null;
+        const cloudUploadDialog = upload ? await verifyCloudUploadDialog(upload, renamedProject) : null;
         await window.screenStudio.hideForScreenshot();
         const screenshot = await window.screenStudio.captureScreenshot({
           title: `Self-test Screenshot ${Date.now()}`,
@@ -1484,6 +1735,7 @@ async function stopRecording() {
           quality: renamedProject.capture?.quality,
           frameRate: renamedProject.capture?.frameRate,
           videoCrf: renamedProject.capture?.videoCrf,
+          postRecordDialog,
           fixedPreviewFrame,
           projectBrowserResize,
           darkTheme,
@@ -1493,7 +1745,8 @@ async function stopRecording() {
           playback,
           screenshot: screenshotPreview,
           regionScreenshot: regionScreenshotPreview,
-          upload
+          upload,
+          cloudUploadDialog
         });
       }
     } catch (error) {
@@ -1575,12 +1828,14 @@ async function saveRecording() {
   activeProject = project;
   selectProject(project.id);
   loadDevices();
+  if (!selfTestMode) showPostRecordDialog(project);
   if (selfTestMode) {
     const fixedPreviewFrame = await verifyFixedPreviewFrame();
     const projectBrowserResize = await verifyProjectBrowserResize();
     const darkTheme = await verifyThemeToggle();
     const minimalUi = await verifyMinimalUi();
     const minioSettingsDialog = await verifyMinioSettingsDialog();
+    const postRecordDialog = await verifyPostRecordDialog(project);
     await window.screenStudio.completeSelfTest({
       ok: true,
       projectPath: project.path,
@@ -1593,6 +1848,7 @@ async function saveRecording() {
       darkTheme,
       minimalUi,
       minioSettingsDialog,
+      postRecordDialog,
       miniRecorder: lastMiniRecorderCheck,
       playbackControlsVisible: playbackControlsVisible()
     });
@@ -1676,6 +1932,60 @@ async function openProjectMediaById(projectId) {
     setStatus(`Opened ${projectToOpen.title} in the default app`);
   } catch (error) {
     setStatus(error.message || 'Unable to open project media');
+  }
+}
+
+async function exportProjectByProject(project = activeProject) {
+  if (!project) return null;
+  exportProject.disabled = true;
+  showJob('Preparing export', 0);
+  try {
+    const exported = await window.screenStudio.exportProject(project.path);
+    if (exported) {
+      setStatus(`Exported to ${exported.path}`);
+      await loadProjects();
+      selectProject(project.id);
+      showJob('Export complete', 100, 'done');
+      hideJobSoon();
+      return exported;
+    }
+    hideJob();
+    return null;
+  } catch (error) {
+    setStatus(error.message || 'Export failed');
+    showJob('Export failed', 0, 'error');
+    return null;
+  } finally {
+    exportProject.disabled = !activeProject;
+  }
+}
+
+async function uploadProjectByProject(project = activeProject) {
+  if (!project) return null;
+  uploadProject.disabled = true;
+  showJob('Preparing cloud upload', 0);
+  try {
+    const configured = await configureMinioIfNeeded(false);
+    if (!configured) {
+      hideJob();
+      return null;
+    }
+    const uploaded = await window.screenStudio.uploadProject(project.path);
+    showJob('Upload complete', 100, 'done');
+    await loadProjects();
+    selectProject(project.id);
+    hideJobSoon();
+    showCloudUploadDialog(uploaded, project);
+    return uploaded;
+  } catch (error) {
+    const retry = window.confirm(`${error.message || 'Upload failed'}\n\nOpen Cloud settings and try again?`);
+    if (retry) {
+      await configureMinioIfNeeded(true);
+    }
+    showJob(error.message || 'Upload failed', 0, 'error');
+    return null;
+  } finally {
+    uploadProject.disabled = !activeProject;
   }
 }
 
@@ -1783,7 +2093,7 @@ function fillMinioForm(existing = {}) {
   minioUploadMode.value = existing.uploadMode || (/\/api\/v1$/i.test(existing.endpoint || '') ? 'console-api' : 's3');
   minioPublicBaseUrl.value = existing.publicBaseUrl || '';
   minioSecretKey.placeholder = existing.hasSecret ? 'Saved secret kept if blank' : 'Required on first setup';
-  minioSettingsStatus.textContent = existing.configured ? `Configured for ${existing.bucket}` : 'Enter MinIO credentials for this PC';
+  minioSettingsStatus.textContent = existing.configured ? `Configured for ${existing.bucket}` : 'Enter cloud credentials for this PC';
   minioSettingsStatus.dataset.state = existing.configured ? 'done' : 'idle';
 }
 
@@ -1801,7 +2111,7 @@ function closeMinioSettingsDialog() {
 
 async function testMinioForm() {
   testMinioSettings.disabled = true;
-  minioSettingsStatus.textContent = 'Testing MinIO connection...';
+  minioSettingsStatus.textContent = 'Testing cloud connection...';
   minioSettingsStatus.dataset.state = 'running';
   try {
     const result = await window.screenStudio.testMinioConfig(minioFormPayload());
@@ -1809,7 +2119,7 @@ async function testMinioForm() {
     minioSettingsStatus.dataset.state = 'done';
     return true;
   } catch (error) {
-    minioSettingsStatus.textContent = error.message || 'MinIO test failed';
+    minioSettingsStatus.textContent = error.message || 'Cloud test failed';
     minioSettingsStatus.dataset.state = 'error';
     return false;
   } finally {
@@ -1818,15 +2128,15 @@ async function testMinioForm() {
 }
 
 async function saveMinioForm() {
-  minioSettingsStatus.textContent = 'Saving MinIO settings...';
+  minioSettingsStatus.textContent = 'Saving cloud settings...';
   minioSettingsStatus.dataset.state = 'running';
   minioConfig = await window.screenStudio.saveMinioConfig(minioFormPayload());
   fillMinioForm(minioConfig);
   refreshDiagnostics();
-  setStatus(`MinIO configured · ${minioConfig.bucket}`);
+  setStatus(`Cloud configured · ${minioConfig.bucket}`);
   minioSettingsStatus.textContent = `Saved · ${minioConfig.bucket}`;
   minioSettingsStatus.dataset.state = 'done';
-  showJob('MinIO settings saved', 100, 'done');
+  showJob('Cloud settings saved', 100, 'done');
   hideJobSoon();
   closeMinioSettingsDialog();
 }
@@ -1946,49 +2256,8 @@ dockRenameProject.addEventListener('click', renameActiveProject);
 stageRenameProject.addEventListener('click', renameActiveProject);
 deleteProject.addEventListener('click', deleteActiveProject);
 openFolder.addEventListener('click', () => window.screenStudio.openFolder(activeProject?.path));
-exportProject.addEventListener('click', async () => {
-  if (!activeProject) return;
-  exportProject.disabled = true;
-  showJob('Preparing export', 0);
-  try {
-    const exported = await window.screenStudio.exportProject(activeProject.path);
-    if (exported) {
-      setStatus(`Exported to ${exported.path}`);
-      await loadProjects();
-    } else {
-      hideJob();
-    }
-  } catch (error) {
-    setStatus(error.message || 'Export failed');
-    showJob('Export failed', 0, 'error');
-  } finally {
-    exportProject.disabled = !activeProject;
-  }
-});
-uploadProject.addEventListener('click', async () => {
-  if (!activeProject) return;
-  uploadProject.disabled = true;
-  showJob('Preparing MinIO upload', 0);
-  try {
-    const configured = await configureMinioIfNeeded(false);
-    if (!configured) {
-      hideJob();
-      return;
-    }
-    const uploaded = await window.screenStudio.uploadProject(activeProject.path);
-    showJob('Upload complete', 100, 'done');
-    await loadProjects();
-    hideJobSoon();
-  } catch (error) {
-    const retry = window.confirm(`${error.message || 'Upload failed'}\n\nOpen MinIO settings and try again?`);
-    if (retry) {
-      await configureMinioIfNeeded(true);
-    }
-    showJob(error.message || 'Upload failed', 0, 'error');
-  } finally {
-    uploadProject.disabled = !activeProject;
-  }
-});
+exportProject.addEventListener('click', () => exportProjectByProject(activeProject));
+uploadProject.addEventListener('click', () => uploadProjectByProject(activeProject));
 
 minioSettings.addEventListener('click', openMinioSettings);
 closeMinioSettings.addEventListener('click', closeMinioSettingsDialog);

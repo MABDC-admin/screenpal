@@ -453,7 +453,7 @@ function sendUploadProgress(jobId, payload) {
 
 function normalizeEndpoint(endpoint) {
   const trimmed = String(endpoint || '').trim().replace(/\/+$/, '');
-  if (!/^https?:\/\//i.test(trimmed)) throw new Error('MinIO endpoint must start with http:// or https://');
+  if (!/^https?:\/\//i.test(trimmed)) throw new Error('Cloud endpoint must start with http:// or https://');
   return trimmed;
 }
 
@@ -464,9 +464,9 @@ function normalizeMinioConfig(payload = {}) {
   const secretAccessKey = String(payload.secretAccessKey || '').trim();
   const region = String(payload.region || 'us-east-1').trim() || 'us-east-1';
   const publicBaseUrl = String(payload.publicBaseUrl || '').trim().replace(/\/+$/, '');
-  if (!bucket) throw new Error('MinIO bucket is required');
-  if (!accessKeyId) throw new Error('MinIO access key is required');
-  if (!secretAccessKey) throw new Error('MinIO secret key is required');
+  if (!bucket) throw new Error('Cloud bucket is required');
+  if (!accessKeyId) throw new Error('Cloud access key is required');
+  if (!secretAccessKey) throw new Error('Cloud secret key is required');
   const uploadMode = payload.uploadMode === 'console-api' || /\/api\/v1$/i.test(endpoint) ? 'console-api' : 's3';
   return { endpoint, bucket, accessKeyId, secretAccessKey, region, publicBaseUrl, uploadMode };
 }
@@ -555,9 +555,9 @@ async function consoleApiLogin(config) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ accessKey: config.accessKeyId, secretKey: config.secretAccessKey })
   });
-  if (!response.ok && response.status !== 204) throw new Error(`MinIO console login failed with ${response.status}`);
+  if (!response.ok && response.status !== 204) throw new Error(`Cloud console login failed with ${response.status}`);
   const cookie = response.headers.get('set-cookie')?.split(';')[0];
-  if (!cookie) throw new Error('MinIO console login did not return a session cookie');
+  if (!cookie) throw new Error('Cloud console login did not return a session cookie');
   return cookie;
 }
 
@@ -572,7 +572,7 @@ async function uploadViaConsoleApi(config, project, stat, key, jobId) {
     sendUploadProgress(jobId, {
       state: 'running',
       percent: stat.size ? Math.min(99, Math.round((loaded / stat.size) * 100)) : 0,
-      message: 'Uploading to MinIO'
+      message: 'Uploading to Cloud'
     });
   });
   const form = new FormData();
@@ -600,7 +600,7 @@ async function uploadViaConsoleApi(config, project, stat, key, jobId) {
       });
       response.on('end', () => {
         if (response.statusCode >= 200 && response.statusCode < 300) resolve();
-        else reject(new Error(body || `MinIO console upload failed with ${response.statusCode}`));
+        else reject(new Error(body || `Cloud console upload failed with ${response.statusCode}`));
       });
     });
     request.on('error', reject);
@@ -1542,14 +1542,14 @@ ipcMain.handle('minio:test-config', async (_event, payload) => {
 ipcMain.handle('projects:upload-minio', async (_event, projectPath) => {
   await ensureRoots();
   const savedConfig = await readMinioConfig({ includeSecret: true });
-  if (!savedConfig) throw new Error('MinIO is not configured');
+  if (!savedConfig) throw new Error('Cloud storage is not configured');
   const config = normalizeMinioConfig(savedConfig);
 
   const project = await readProject(projectPath);
   const stat = await fs.stat(project.mediaPath);
   const key = projectUploadKey(project);
   const jobId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  sendUploadProgress(jobId, { state: 'running', percent: 0, message: 'Starting MinIO upload' });
+  sendUploadProgress(jobId, { state: 'running', percent: 0, message: 'Starting Cloud upload' });
   if (config.uploadMode === 'console-api') {
     await uploadViaConsoleApi(config, project, stat, key, jobId);
   } else {
@@ -1576,7 +1576,7 @@ ipcMain.handle('projects:upload-minio', async (_event, projectPath) => {
       sendUploadProgress(jobId, {
         state: 'running',
         percent: total ? Math.min(99, Math.round((loaded / total) * 100)) : 0,
-        message: 'Uploading to MinIO'
+        message: 'Uploading to Cloud'
       });
     });
 
@@ -1591,7 +1591,7 @@ ipcMain.handle('projects:upload-minio', async (_event, projectPath) => {
   ];
   await writeProject(project.path, meta);
   sendUploadProgress(jobId, { state: 'done', percent: 100, message: 'Upload complete' });
-  log('Uploaded project to MinIO', `${config.bucket}/${key}`);
+  log('Uploaded project to Cloud', `${config.bucket}/${key}`);
   return { bucket: config.bucket, key, url, sizeBytes: stat.size, jobId };
 });
 
@@ -1607,6 +1607,22 @@ ipcMain.handle('projects:openMedia', async (_event, projectPath) => {
   const error = await shell.openPath(project.mediaPath);
   if (error) throw new Error(error);
   log('Opened project media externally', project.mediaPath);
+  return true;
+});
+
+function normalizeExternalUrl(url) {
+  const target = String(url || '').trim();
+  if (!/^https?:\/\//i.test(target)) throw new Error('Cloud URL must start with http:// or https://');
+  return target;
+}
+
+ipcMain.handle('app:open-external-url', async (_event, url) => {
+  await shell.openExternal(normalizeExternalUrl(url));
+  return true;
+});
+
+ipcMain.handle('app:download-url', async (_event, url) => {
+  mainWindow?.webContents.downloadURL(normalizeExternalUrl(url));
   return true;
 });
 

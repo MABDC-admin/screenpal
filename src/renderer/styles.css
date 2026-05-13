@@ -96,6 +96,8 @@ body.dark-theme .project-browser-head {
 
 body.dark-theme .brand h1,
 body.dark-theme .topbar h2,
+body.dark-theme .text-dialog h2,
+body.dark-theme .record-save-summary strong,
 body.dark-theme #activeMeta,
 body.dark-theme .project-info strong,
 body.dark-theme label,
@@ -258,6 +260,16 @@ body.dark-theme .project-resize-handle::after {
 
 body.dark-theme .project-thumb-empty,
 body.dark-theme .empty-state {
+  color: var(--muted);
+}
+
+body.dark-theme .record-save-summary {
+  background: #12161c;
+  border-color: var(--line);
+}
+
+body.dark-theme .record-save-summary span,
+body.dark-theme .record-save-summary small {
   color: var(--muted);
 }
 
@@ -1423,6 +1435,14 @@ body.split-resizing .project-list {
   box-shadow: var(--shadow-lg);
 }
 
+.post-record-dialog {
+  width: min(620px, calc(100vw - 48px));
+}
+
+.cloud-upload-dialog {
+  width: min(720px, calc(100vw - 48px));
+}
+
 .text-dialog h2 {
   font-size: 18px;
   color: #0f172a;
@@ -1440,6 +1460,71 @@ body.split-resizing .project-list {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+.record-save-summary {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid #dce4ef;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.record-save-summary strong {
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-save-summary span {
+  color: #536174;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.record-save-summary small {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.post-record-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cloud-url-label {
+  display: grid;
+  gap: 8px;
+  color: #536174;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.cloud-url-input {
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  text-transform: none;
+}
+
+.cloud-url-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.post-record-actions .primary-action,
+.post-record-actions .secondary-action,
+.cloud-url-actions .primary-action,
+.cloud-url-actions .secondary-action {
+  width: 100%;
+  min-width: 0;
 }
 
 #jobText {
@@ -1659,6 +1744,14 @@ body.split-resizing .project-list {
   }
 
   .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .post-record-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .cloud-url-actions {
     grid-template-columns: 1fr;
   }
 }
