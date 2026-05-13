@@ -21,6 +21,7 @@ const appIconIcoPath = path.join(__dirname, '..', 'assets', 'icon.ico');
 
 let mainWindow;
 let guideWindow;
+let countdownWindow;
 let guideResolver;
 let tray;
 let isQuitting = false;
@@ -263,6 +264,97 @@ function createGuideWindow() {
       guideResolver = null;
     }
   });
+}
+
+async function showRecordingCountdown(seconds) {
+  const duration = Math.max(0, Math.min(10, Math.round(Number(seconds || 0))));
+  if (!duration) return { visible: false, seconds: 0 };
+
+  if (countdownWindow && !countdownWindow.isDestroyed()) countdownWindow.close();
+  const display = screen.getPrimaryDisplay();
+  countdownWindow = new BrowserWindow({
+    x: display.bounds.x,
+    y: display.bounds.y,
+    width: display.bounds.width,
+    height: display.bounds.height,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    focusable: false,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+  countdownWindow.setIgnoreMouseEvents(true);
+  countdownWindow.setAlwaysOnTop(true, 'screen-saver');
+  const markup = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: transparent;
+        font-family: Segoe UI, Arial, sans-serif;
+      }
+      body {
+        display: grid;
+        place-items: center;
+      }
+      #count {
+        width: 190px;
+        height: 190px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        background: rgba(8, 13, 21, 0.82);
+        color: #ffffff;
+        font-size: 96px;
+        font-weight: 900;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35), inset 0 0 0 3px rgba(255, 255, 255, 0.18);
+      }
+      #label {
+        position: fixed;
+        left: 50%;
+        top: calc(50% + 126px);
+        transform: translateX(-50%);
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: rgba(8, 13, 21, 0.78);
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 800;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="count">${duration}</div>
+    <div id="label">Recording starts</div>
+  </body>
+</html>`;
+  await countdownWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(markup)}`);
+
+  for (let remaining = duration; remaining > 0; remaining -= 1) {
+    if (!countdownWindow || countdownWindow.isDestroyed()) break;
+    countdownWindow.webContents.executeJavaScript(`document.getElementById("count").textContent = "${remaining}"`).catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  if (countdownWindow && !countdownWindow.isDestroyed()) {
+    countdownWindow.close();
+  }
+  countdownWindow = null;
+  return { visible: true, seconds: duration, surface: 'screen-overlay' };
 }
 
 function safeProjectName(name) {
@@ -792,112 +884,22 @@ function screenshotExtensionForMime(mimeType = 'image/png') {
   return '.png';
 }
 
-async function compressedScreenshotCandidate(sourcePath, outputPath) {
-  await runFfmpegProcess([
-    '-hide_banner',
-    '-y',
-    '-i', sourcePath,
-    '-frames:v', '1',
-    '-c:v', 'libwebp',
-    '-quality', '95',
-    '-compression_level', '4',
-    '-preset', 'picture',
-    outputPath
-  ]);
-  const stat = await fs.stat(outputPath);
-  if (!stat.size) throw new Error('WebP compressor produced an empty image');
-  return stat;
-}
-
-async function optimizeScreenshotPng(sourcePath, outputPath) {
-  await runFfmpegProcess([
-    '-hide_banner',
-    '-y',
-    '-i', sourcePath,
-    '-frames:v', '1',
-    '-compression_level', '9',
-    '-pred', 'mixed',
-    outputPath
-  ]);
-  const stat = await fs.stat(outputPath);
-  if (!stat.size) throw new Error('PNG optimizer produced an empty image');
-  return stat;
-}
-
 async function compressScreenshotImage(sourcePath, mediaDir) {
   const originalStat = await fs.stat(sourcePath);
-  const webpPath = path.join(mediaDir, 'screenshot.webp');
-  const optimizedPngPath = path.join(mediaDir, 'screenshot-optimized.png');
-  let best = {
+  return {
     path: sourcePath,
     mimeType: 'image/png',
     source: 'media/screenshot.png',
     sizeBytes: originalStat.size,
     compression: {
-      enabled: true,
-      codec: 'png',
+      enabled: false,
+      codec: 'png-high-res',
       originalSizeBytes: originalStat.size,
       compressedSizeBytes: originalStat.size,
       savedBytes: 0,
       ratio: 1
     }
   };
-
-  try {
-    const webpStat = await compressedScreenshotCandidate(sourcePath, webpPath);
-    if (webpStat.size < best.sizeBytes) {
-      best = {
-        path: webpPath,
-        mimeType: 'image/webp',
-        source: 'media/screenshot.webp',
-        sizeBytes: webpStat.size,
-        compression: {
-          enabled: true,
-          codec: 'webp-q95',
-          originalSizeBytes: originalStat.size,
-          compressedSizeBytes: webpStat.size,
-          savedBytes: Math.max(0, originalStat.size - webpStat.size),
-          ratio: Number((webpStat.size / Math.max(1, originalStat.size)).toFixed(4))
-        }
-      };
-    } else {
-      await fs.rm(webpPath, { force: true });
-    }
-  } catch (error) {
-    await fs.rm(webpPath, { force: true }).catch(() => {});
-    log('WebP screenshot compression failed', error.message);
-  }
-
-  if (best.path === sourcePath) {
-    try {
-      const optimizedStat = await optimizeScreenshotPng(sourcePath, optimizedPngPath);
-      if (optimizedStat.size < best.sizeBytes) {
-        await fs.rename(optimizedPngPath, sourcePath);
-        best = {
-          ...best,
-          sizeBytes: optimizedStat.size,
-          compression: {
-            enabled: true,
-            codec: 'png-level9',
-            originalSizeBytes: originalStat.size,
-            compressedSizeBytes: optimizedStat.size,
-            savedBytes: Math.max(0, originalStat.size - optimizedStat.size),
-            ratio: Number((optimizedStat.size / Math.max(1, originalStat.size)).toFixed(4))
-          }
-        };
-      } else {
-        await fs.rm(optimizedPngPath, { force: true });
-      }
-    } catch (error) {
-      await fs.rm(optimizedPngPath, { force: true }).catch(() => {});
-      log('PNG screenshot optimization failed', error.message);
-    }
-  }
-
-  if (best.path !== sourcePath) {
-    await fs.rm(sourcePath, { force: true }).catch(() => {});
-  }
-  return best;
 }
 
 async function captureSharpScreenshotPng(rect, outputPath) {
@@ -1358,7 +1360,7 @@ ipcMain.handle('projects:capture-screenshot', async (_event, payload = {}) => {
       engine: `ffmpeg-${screenshotBackend}-screenshot`,
       width: imageSize.width,
       height: imageSize.height,
-      quality: '8k-sharp-compressed',
+      quality: '8k-sharp-png',
       compression: compressed.compression
     },
     edit: {
@@ -1372,7 +1374,7 @@ ipcMain.handle('projects:capture-screenshot', async (_event, payload = {}) => {
       ...captureConfig,
       rect,
       engine: `ffmpeg-${screenshotBackend}-screenshot`,
-      screenshotQuality: '8k-sharp-compressed',
+      screenshotQuality: '8k-sharp-png',
       screenshotBackend,
       screenshotCompression: compressed.compression
     },
@@ -1667,6 +1669,10 @@ ipcMain.handle('capture:select-region', async () => {
   });
 });
 
+ipcMain.handle('capture:record-countdown', async (_event, seconds) => {
+  return await showRecordingCountdown(seconds);
+});
+
 ipcMain.handle('capture:start-native', async (_event, payload = {}) => {
   await ensureRoots();
   if (activeNativeCapture) throw new Error('A recording is already running');
@@ -1853,6 +1859,7 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  countdownWindow?.close();
   if (activeNativeCapture) {
     try {
       activeNativeCapture.process.stdin.write('q');

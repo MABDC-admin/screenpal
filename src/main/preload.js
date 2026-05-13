@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('screenStudio', {
   hideForScreenshot: () => ipcRenderer.invoke('window:hide-for-screenshot'),
   showAfterScreenshot: () => ipcRenderer.invoke('window:show-after-screenshot'),
   selectRegion: () => ipcRenderer.invoke('capture:select-region'),
+  recordCountdown: (seconds) => ipcRenderer.invoke('capture:record-countdown', seconds),
   audioDevices: () => ipcRenderer.invoke('capture:audio-devices'),
   diagnostics: () => ipcRenderer.invoke('capture:diagnostics'),
   startNativeCapture: (payload) => ipcRenderer.invoke('capture:start-native', payload),

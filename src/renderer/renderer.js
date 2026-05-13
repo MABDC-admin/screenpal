@@ -117,6 +117,7 @@ let nativeAudioDestination = null;
 let nativeAudioStartedAt = 0;
 let nativeAudioFlags = null;
 let jobHideTimer = null;
+let lastCountdownCheck = null;
 const selfTestMode = new URLSearchParams(window.location.search).get('selftest') === '1';
 const projectBrowserHeightKey = 'screenStudio.projectBrowserHeight';
 const previewHeightKey = 'screenStudio.previewHeight';
@@ -1314,8 +1315,18 @@ function defaultRegion() {
 
 async function countdownDelay() {
   let remaining = Number(countdown.value || 0);
-  if (!remaining) return;
+  if (!remaining) {
+    lastCountdownCheck = { visible: false, seconds: 0, skipped: true };
+    return;
+  }
+  setStatus(`Recording starts in ${remaining} seconds`);
+  if (window.screenStudio.recordCountdown) {
+    lastCountdownCheck = await window.screenStudio.recordCountdown(remaining);
+    hideCountdownOverlay();
+    return;
+  }
   countdownOverlay.hidden = false;
+  lastCountdownCheck = { visible: true, seconds: remaining, surface: 'app-overlay' };
   while (remaining > 0) {
     countdownOverlay.textContent = String(remaining);
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -1661,6 +1672,9 @@ async function stopRecording() {
         activeProject = renamedProject;
         selectProject(renamedProject.id);
         const postRecordDialog = await verifyPostRecordDialog(renamedProject);
+        if (!lastCountdownCheck?.visible || !lastCountdownCheck.seconds || !/overlay/i.test(lastCountdownCheck.surface || '')) {
+          throw new Error(`Recording countdown overlay did not run: ${JSON.stringify(lastCountdownCheck)}`);
+        }
         const fixedPreviewFrame = await verifyFixedPreviewFrame();
         const projectBrowserResize = await verifyProjectBrowserResize();
         const darkTheme = await verifyThemeToggle();
@@ -1687,7 +1701,7 @@ async function stopRecording() {
           bytes: screenshot.sizeBytes,
           uploadVisible: uploadProject.getBoundingClientRect().width > 40 && !uploadProject.disabled
         };
-        if (!screenshotPreview.visible || !screenshotPreview.mimeType?.startsWith('image/') || screenshotPreview.bytes <= 0 || screenshotPreview.width < 7680 || !screenshotPreview.engine?.startsWith('ffmpeg-') || !screenshotPreview.compression?.enabled || screenshotPreview.compression.compressedSizeBytes > screenshotPreview.compression.originalSizeBytes) {
+        if (!screenshotPreview.visible || screenshotPreview.mimeType !== 'image/png' || screenshotPreview.bytes <= 0 || screenshotPreview.width < 7680 || !screenshotPreview.engine?.startsWith('ffmpeg-') || screenshotPreview.compression?.codec !== 'png-high-res') {
           throw new Error(`Screenshot project did not preview correctly: ${JSON.stringify(screenshotPreview)}`);
         }
         await window.screenStudio.hideForScreenshot();
@@ -1709,8 +1723,8 @@ async function stopRecording() {
           compression: regionScreenshot.media?.compression || null,
           bytes: regionScreenshot.sizeBytes
         };
-        if (!regionScreenshotPreview.mimeType?.startsWith('image/') || regionScreenshotPreview.bytes <= 0 || regionScreenshotPreview.width < 7680 || !regionScreenshotPreview.engine?.startsWith('ffmpeg-') || !regionScreenshotPreview.compression?.enabled || regionScreenshotPreview.compression.compressedSizeBytes > regionScreenshotPreview.compression.originalSizeBytes) {
-          throw new Error(`Region screenshot did not save as compressed 8K image: ${JSON.stringify(regionScreenshotPreview)}`);
+        if (regionScreenshotPreview.mimeType !== 'image/png' || regionScreenshotPreview.bytes <= 0 || regionScreenshotPreview.width < 7680 || !regionScreenshotPreview.engine?.startsWith('ffmpeg-') || regionScreenshotPreview.compression?.codec !== 'png-high-res') {
+          throw new Error(`Region screenshot did not save as high-resolution PNG image: ${JSON.stringify(regionScreenshotPreview)}`);
         }
         await window.screenStudio.completeSelfTest({
           ok: true,
@@ -1735,6 +1749,7 @@ async function stopRecording() {
           quality: renamedProject.capture?.quality,
           frameRate: renamedProject.capture?.frameRate,
           videoCrf: renamedProject.capture?.videoCrf,
+          countdownOverlay: lastCountdownCheck,
           postRecordDialog,
           fixedPreviewFrame,
           projectBrowserResize,
@@ -1848,6 +1863,7 @@ async function saveRecording() {
       darkTheme,
       minimalUi,
       minioSettingsDialog,
+      countdownOverlay: lastCountdownCheck,
       postRecordDialog,
       miniRecorder: lastMiniRecorderCheck,
       playbackControlsVisible: playbackControlsVisible()
@@ -2005,6 +2021,7 @@ async function deleteProjectById(id) {
 
 async function captureScreenshotProject() {
   takeScreenshot.disabled = true;
+  hideCountdownOverlay();
   showJob('Capturing screenshot', 0);
   let screenshotWindowHidden = false;
   try {
@@ -2028,7 +2045,7 @@ async function captureScreenshotProject() {
       captureConfig: {
         ...buildCaptureConfig(),
         region: screenshotRegion,
-        screenshotQuality: '8k-sharp'
+        screenshotQuality: '8k-sharp-png'
       }
     });
     await window.screenStudio.showAfterScreenshot();
@@ -2323,17 +2340,17 @@ async function runSelfTest() {
     captureMode.value = 'full';
     systemAudio.checked = true;
     micAudio.checked = false;
-    countdown.value = '0';
+    countdown.value = '1';
     recordingQuality.value = 'ultra';
     selectProject(null);
     watchdog = setTimeout(() => {
       if (recorderState === 'recording' || recorderState === 'selecting' || nativeCaptureSession) {
         stopRecording().catch(() => {});
       }
-    }, 4500);
+    }, 9000);
     await Promise.race([
       startRecording(),
-      new Promise((resolve) => setTimeout(resolve, 5200))
+      new Promise((resolve) => setTimeout(resolve, 5000))
     ]);
     if (captureMode.value === 'region' && !selectedRegion) {
       throw new Error('Region guide did not return a selection');
