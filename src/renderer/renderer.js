@@ -1672,7 +1672,7 @@ async function stopRecording() {
         activeProject = renamedProject;
         selectProject(renamedProject.id);
         const postRecordDialog = await verifyPostRecordDialog(renamedProject);
-        if (!lastCountdownCheck?.visible || !lastCountdownCheck.seconds || !/overlay/i.test(lastCountdownCheck.surface || '')) {
+        if (!lastCountdownCheck?.visible || !lastCountdownCheck.seconds || !/overlay/i.test(lastCountdownCheck.surface || '') || !lastCountdownCheck.closedBeforeCapture || lastCountdownCheck.settleMs < 500) {
           throw new Error(`Recording countdown overlay did not run: ${JSON.stringify(lastCountdownCheck)}`);
         }
         const fixedPreviewFrame = await verifyFixedPreviewFrame();

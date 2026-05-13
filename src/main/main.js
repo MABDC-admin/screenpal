@@ -266,11 +266,26 @@ function createGuideWindow() {
   });
 }
 
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function closeCountdownWindow() {
+  const target = countdownWindow;
+  countdownWindow = null;
+  if (!target || target.isDestroyed()) return false;
+  await new Promise((resolve) => {
+    target.once('closed', resolve);
+    target.close();
+  });
+  return true;
+}
+
 async function showRecordingCountdown(seconds) {
   const duration = Math.max(0, Math.min(10, Math.round(Number(seconds || 0))));
   if (!duration) return { visible: false, seconds: 0 };
 
-  if (countdownWindow && !countdownWindow.isDestroyed()) countdownWindow.close();
+  await closeCountdownWindow();
   const display = screen.getPrimaryDisplay();
   countdownWindow = new BrowserWindow({
     x: display.bounds.x,
@@ -347,14 +362,13 @@ async function showRecordingCountdown(seconds) {
   for (let remaining = duration; remaining > 0; remaining -= 1) {
     if (!countdownWindow || countdownWindow.isDestroyed()) break;
     countdownWindow.webContents.executeJavaScript(`document.getElementById("count").textContent = "${remaining}"`).catch(() => {});
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await wait(1000);
   }
 
-  if (countdownWindow && !countdownWindow.isDestroyed()) {
-    countdownWindow.close();
-  }
-  countdownWindow = null;
-  return { visible: true, seconds: duration, surface: 'screen-overlay' };
+  const closed = await closeCountdownWindow();
+  const settleMs = 650;
+  await wait(settleMs);
+  return { visible: true, seconds: duration, surface: 'screen-overlay', closedBeforeCapture: closed, settleMs };
 }
 
 function safeProjectName(name) {
@@ -1859,7 +1873,7 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
-  countdownWindow?.close();
+  closeCountdownWindow().catch(() => {});
   if (activeNativeCapture) {
     try {
       activeNativeCapture.process.stdin.write('q');
