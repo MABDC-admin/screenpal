@@ -12,6 +12,7 @@ let controlWindow;
 let tray;
 let isQuitting = false;
 let inputEnabled = true;
+let controlWindowPosition = null;
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
@@ -28,7 +29,34 @@ function logoDataUri() {
 function closeControlWindow() {
   const target = controlWindow;
   controlWindow = null;
-  if (target && !target.isDestroyed()) target.close();
+  if (target && !target.isDestroyed()) {
+    controlWindowPosition = target.getBounds();
+    target.close();
+  }
+}
+
+function clampControlWindowPosition(bounds) {
+  const display = screen.getDisplayMatching(bounds);
+  const area = display.workArea;
+  return {
+    x: Math.max(area.x + 8, Math.min(bounds.x, area.x + area.width - bounds.width - 8)),
+    y: Math.max(area.y + 8, Math.min(bounds.y, area.y + area.height - bounds.height - 8)),
+    width: bounds.width,
+    height: bounds.height
+  };
+}
+
+function moveControlWindow(deltaX, deltaY) {
+  if (!controlWindow || controlWindow.isDestroyed()) return false;
+  const current = controlWindow.getBounds();
+  const next = clampControlWindowPosition({
+    ...current,
+    x: current.x + Number(deltaX || 0),
+    y: current.y + Number(deltaY || 0)
+  });
+  controlWindow.setBounds(next);
+  controlWindowPosition = next;
+  return true;
 }
 
 function showControlWindow() {
@@ -39,15 +67,23 @@ function showControlWindow() {
   }
   const display = screen.getPrimaryDisplay();
   const area = display.workArea;
+  const width = 98;
+  const height = 58;
+  const initialBounds = clampControlWindowPosition(controlWindowPosition || {
+    x: area.x + area.width - width - 20,
+    y: area.y + area.height - height - 84,
+    width,
+    height
+  });
   controlWindow = new BrowserWindow({
-    x: area.x + area.width - 110,
-    y: area.y + 188,
-    width: 88,
-    height: 56,
+    x: initialBounds.x,
+    y: initialBounds.y,
+    width: initialBounds.width,
+    height: initialBounds.height,
     frame: false,
     transparent: true,
     resizable: false,
-    movable: false,
+    movable: true,
     alwaysOnTop: true,
     skipTaskbar: true,
     fullscreenable: false,
@@ -67,7 +103,8 @@ function showControlWindow() {
     <meta charset="utf-8" />
     <style>
       html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; font-family: Segoe UI, Arial, sans-serif; }
-      button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 76px; height: 44px; margin: 6px; border: 1px solid rgba(98, 221, 234, 0.86); border-radius: 999px; background: rgba(35, 138, 154, 0.96); color: white; font-size: 12px; font-weight: 900; box-shadow: 0 14px 40px rgba(0,0,0,.28); }
+      button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 86px; height: 46px; margin: 6px; border: 1px solid rgba(98, 221, 234, 0.86); border-radius: 999px; background: rgba(35, 138, 154, 0.96); color: white; font-size: 12px; font-weight: 900; box-shadow: 0 14px 40px rgba(0,0,0,.28); cursor: grab; }
+      button:active { cursor: grabbing; }
       img { width: 22px; height: 22px; border-radius: 999px; background: white; object-fit: cover; }
       button:hover { background: rgba(45, 164, 181, 0.98); }
     </style>
@@ -75,7 +112,36 @@ function showControlWindow() {
   <body>
     <button id="tools" type="button" title="Turn annotation tools on"><img src="${logoDataUri()}" alt="" />Tools</button>
     <script>
-      document.getElementById('tools').addEventListener('click', () => {
+      const tools = document.getElementById('tools');
+      let dragging = false;
+      let moved = false;
+      let lastX = 0;
+      let lastY = 0;
+      tools.addEventListener('pointerdown', (event) => {
+        dragging = true;
+        moved = false;
+        lastX = event.screenX;
+        lastY = event.screenY;
+        tools.setPointerCapture(event.pointerId);
+      });
+      tools.addEventListener('pointermove', (event) => {
+        if (!dragging) return;
+        const deltaX = event.screenX - lastX;
+        const deltaY = event.screenY - lastY;
+        if (Math.abs(deltaX) + Math.abs(deltaY) < 1) return;
+        moved = true;
+        lastX = event.screenX;
+        lastY = event.screenY;
+        window.screenStudioAnnotation.moveControlWindow(deltaX, deltaY);
+      });
+      tools.addEventListener('pointerup', () => {
+        dragging = false;
+      });
+      tools.addEventListener('click', () => {
+        if (moved) {
+          moved = false;
+          return;
+        }
         window.screenStudioAnnotation.setInputMode(true);
       });
     </script>
@@ -194,6 +260,7 @@ function createMenu() {
 }
 
 ipcMain.handle('annotation:set-input-mode', (_event, enabled) => setInputMode(enabled));
+ipcMain.handle('annotation:move-control-window', (_event, deltaX, deltaY) => moveControlWindow(deltaX, deltaY));
 ipcMain.handle('annotation:close', () => {
   hideTools();
   return true;
