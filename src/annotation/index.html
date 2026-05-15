@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self'"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-src https://www.youtube.com https://www.youtube-nocookie.com"
     />
     <title>Recording Annotations</title>
     <link rel="stylesheet" href="./annotation.css" />
@@ -27,6 +27,8 @@
       <button class="tool" type="button" data-tool="ellipse" title="Circle or ellipse">Circle</button>
       <button class="tool" type="button" data-tool="spotlight" title="Pointer spotlight">Pointer</button>
       <button class="tool" type="button" data-tool="text" title="Text label">Text</button>
+      <button class="tool" type="button" data-tool="move" title="Move existing objects">Move</button>
+      <button id="supplementToggle" type="button" title="Show supplementary tools">More</button>
       <label class="color-field" title="Annotation color">
         <span>Color</span>
         <input id="color" type="color" value="#ff2d55" />
@@ -39,6 +41,37 @@
       <button id="clear" type="button" title="Clear all objects">Clear</button>
       <button id="stop" class="danger" type="button" title="Stop recording">Stop Rec</button>
       <button id="close" type="button" title="Hide annotation tools but keep the reopen button available">Hide Tools</button>
+    </div>
+    <div id="supplementPanel" class="supplement-panel hidden" aria-label="Supplementary annotation tools">
+      <button class="supplement-tool" type="button" data-tool="blur" title="Cover sensitive information">Blur Info</button>
+      <button class="supplement-tool" type="button" data-tool="formula" title="Insert math formula text">Formula</button>
+      <button id="youtubeTool" type="button" title="Open YouTube playback tool">YouTube</button>
+    </div>
+    <div id="textEditor" class="text-editor hidden" role="dialog" aria-label="Insert annotation text">
+      <label id="textEditorTitle" for="textEditorInput">Text</label>
+      <input id="textEditorInput" type="text" autocomplete="off" spellcheck="false" />
+      <button id="textEditorInsert" type="button">Insert</button>
+      <button id="textEditorCancel" type="button">Cancel</button>
+    </div>
+    <div id="youtubePlayer" class="youtube-player hidden" aria-label="YouTube playback">
+      <div id="youtubeHeader" class="youtube-header">
+        <strong>YouTube</strong>
+        <div class="youtube-actions">
+          <button id="youtubeFullscreen" type="button">Full</button>
+          <button id="youtubeClose" type="button">Close</button>
+        </div>
+      </div>
+      <div class="youtube-controls">
+        <input id="youtubeUrl" type="url" placeholder="Paste YouTube link" />
+        <button id="youtubeLoad" type="button">Play</button>
+      </div>
+      <iframe
+        id="youtubeFrame"
+        title="YouTube player"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen
+      ></iframe>
+      <div id="youtubeResize" class="youtube-resize" title="Resize YouTube player"></div>
     </div>
     <script src="./annotation.js"></script>
   </body>

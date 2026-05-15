@@ -8,6 +8,22 @@ const undoButton = document.getElementById('undo');
 const clearButton = document.getElementById('clear');
 const stopButton = document.getElementById('stop');
 const closeButton = document.getElementById('close');
+const supplementToggle = document.getElementById('supplementToggle');
+const supplementPanel = document.getElementById('supplementPanel');
+const youtubeTool = document.getElementById('youtubeTool');
+const textEditor = document.getElementById('textEditor');
+const textEditorTitle = document.getElementById('textEditorTitle');
+const textEditorInput = document.getElementById('textEditorInput');
+const textEditorInsert = document.getElementById('textEditorInsert');
+const textEditorCancel = document.getElementById('textEditorCancel');
+const youtubePlayer = document.getElementById('youtubePlayer');
+const youtubeHeader = document.getElementById('youtubeHeader');
+const youtubeUrl = document.getElementById('youtubeUrl');
+const youtubeLoad = document.getElementById('youtubeLoad');
+const youtubeFrame = document.getElementById('youtubeFrame');
+const youtubeClose = document.getElementById('youtubeClose');
+const youtubeFullscreen = document.getElementById('youtubeFullscreen');
+const youtubeResize = document.getElementById('youtubeResize');
 const standaloneMode = new URLSearchParams(window.location.search).get('standalone') === '1';
 
 const ctx = canvas.getContext('2d');
@@ -21,6 +37,11 @@ let inputEnabled = true;
 let toolbarCollapsed = false;
 let autoHideTimer = null;
 let toolbarDrag = null;
+let moveTarget = null;
+let moveLastPoint = null;
+let pendingText = null;
+let youtubeMove = null;
+let youtubeSize = null;
 
 function setToolbarCollapsed(collapsed) {
   toolbarCollapsed = Boolean(collapsed);
@@ -72,9 +93,112 @@ function shouldDragToolbar(target) {
   return target === toolbar || Boolean(target.closest('.annotation-brand'));
 }
 
+function clampFloatingRect(left, top, width, height) {
+  const margin = 8;
+  return {
+    left: Math.max(margin, Math.min(left, window.innerWidth - width - margin)),
+    top: Math.max(margin, Math.min(top, window.innerHeight - height - margin)),
+    width: Math.max(320, Math.min(width, window.innerWidth - margin * 2)),
+    height: Math.max(240, Math.min(height, window.innerHeight - margin * 2))
+  };
+}
+
+function positionTextEditor(point, type) {
+  pendingText = { point, type };
+  textEditorTitle.textContent = type === 'formula' ? 'Math formula' : 'Text label';
+  textEditorInput.placeholder = type === 'formula' ? 'Example: x^2 + y^2 = r^2' : 'Type label text';
+  textEditorInput.value = '';
+  textEditor.classList.remove('hidden');
+  const rect = textEditor.getBoundingClientRect();
+  const left = Math.min(point.x + 12, window.innerWidth - rect.width - 12);
+  const top = Math.min(point.y + 12, window.innerHeight - rect.height - 12);
+  textEditor.style.left = `${Math.max(12, left)}px`;
+  textEditor.style.top = `${Math.max(12, top)}px`;
+  textEditorInput.focus();
+}
+
+function closeTextEditor() {
+  pendingText = null;
+  textEditor.classList.add('hidden');
+}
+
+function insertPendingText() {
+  if (!pendingText) return;
+  const text = textEditorInput.value.trim();
+  if (text) {
+    objects.push({
+      type: pendingText.type,
+      start: pendingText.point,
+      text,
+      ...currentStyle()
+    });
+    redraw();
+  }
+  closeTextEditor();
+  scheduleAutoHide();
+}
+
+function toggleSupplementPanel(force) {
+  const visible = force ?? supplementPanel.classList.contains('hidden');
+  supplementPanel.classList.toggle('hidden', !visible);
+  supplementToggle.classList.toggle('active', visible);
+  if (visible) positionSupplementPanel();
+  wakeToolbar();
+}
+
+function positionSupplementPanel() {
+  const toolbarRect = toolbar.getBoundingClientRect();
+  const panelRect = supplementPanel.getBoundingClientRect();
+  const left = Math.max(8, Math.min(toolbarRect.left, window.innerWidth - panelRect.width - 8));
+  const preferredTop = toolbarRect.top - panelRect.height - 8;
+  const top = preferredTop >= 8 ? preferredTop : Math.min(toolbarRect.bottom + 8, window.innerHeight - panelRect.height - 8);
+  supplementPanel.style.left = `${left}px`;
+  supplementPanel.style.top = `${Math.max(8, top)}px`;
+  supplementPanel.style.bottom = 'auto';
+  supplementPanel.style.transform = 'none';
+}
+
+function extractYouTubeId(value) {
+  const input = value.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
+  try {
+    const url = new URL(input);
+    if (url.hostname.includes('youtu.be')) return url.pathname.split('/').filter(Boolean)[0] || '';
+    if (url.pathname.startsWith('/shorts/')) return url.pathname.split('/')[2] || '';
+    if (url.pathname.startsWith('/embed/')) return url.pathname.split('/')[2] || '';
+    return url.searchParams.get('v') || '';
+  } catch {
+    return '';
+  }
+}
+
+function openYouTubePlayer() {
+  youtubePlayer.classList.remove('hidden');
+  youtubeUrl.focus();
+  wakeToolbar();
+}
+
+function loadYouTubeVideo() {
+  const videoId = extractYouTubeId(youtubeUrl.value);
+  if (!videoId) {
+    youtubeUrl.focus();
+    return;
+  }
+  youtubeFrame.src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&rel=0&modestbranding=1`;
+}
+
+function applyYouTubeBounds(left, top, width, height) {
+  const bounds = clampFloatingRect(left, top, width, height);
+  youtubePlayer.style.left = `${bounds.left}px`;
+  youtubePlayer.style.top = `${bounds.top}px`;
+  youtubePlayer.style.width = `${bounds.width}px`;
+  youtubePlayer.style.height = `${bounds.height}px`;
+}
+
 function clearObjects() {
   objects.length = 0;
   activeObject = null;
+  closeTextEditor();
   redraw();
   wakeToolbar();
 }
@@ -110,10 +234,97 @@ function resizeCanvas() {
     const rect = toolbar.getBoundingClientRect();
     applyToolbarPosition(rect.left, rect.top, true);
   }
+  if (!supplementPanel.classList.contains('hidden')) positionSupplementPanel();
+  if (!youtubePlayer.classList.contains('hidden') && !youtubePlayer.classList.contains('fullscreen')) {
+    const rect = youtubePlayer.getBoundingClientRect();
+    applyYouTubeBounds(rect.left, rect.top, rect.width, rect.height);
+  }
 }
 
 function pointFromEvent(event) {
   return { x: event.clientX, y: event.clientY };
+}
+
+function boundsFromPoints(points) {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  return {
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    width: Math.max(...xs) - Math.min(...xs),
+    height: Math.max(...ys) - Math.min(...ys)
+  };
+}
+
+function objectBounds(item) {
+  if (item.type === 'pen') {
+    return boundsFromPoints(item.points);
+  }
+  if (item.type === 'arrow' || item.type === 'rect' || item.type === 'ellipse' || item.type === 'blur') {
+    const x = Math.min(item.start.x, item.end.x);
+    const y = Math.min(item.start.y, item.end.y);
+    return {
+      x,
+      y,
+      width: Math.abs(item.end.x - item.start.x),
+      height: Math.abs(item.end.y - item.start.y)
+    };
+  }
+  if (item.type === 'spotlight') {
+    const radius = Math.max(22, Math.hypot(item.end.x - item.start.x, item.end.y - item.start.y));
+    return {
+      x: item.start.x - radius,
+      y: item.start.y - radius,
+      width: radius * 2,
+      height: radius * 2
+    };
+  }
+  if (item.type === 'text' || item.type === 'formula') {
+    ctx.save();
+    ctx.font = item.type === 'formula'
+      ? `italic ${Math.max(22, item.width * 5)}px "Cambria Math", Cambria, Georgia, serif`
+      : `${Math.max(20, item.width * 5)}px Segoe UI`;
+    const metrics = ctx.measureText(item.text);
+    const height = Math.max(24, item.width * 6);
+    ctx.restore();
+    return {
+      x: item.start.x,
+      y: item.start.y - height,
+      width: Math.max(32, metrics.width),
+      height
+    };
+  }
+  return { x: 0, y: 0, width: 0, height: 0 };
+}
+
+function pointInBounds(point, bounds, padding = 14) {
+  return point.x >= bounds.x - padding &&
+    point.x <= bounds.x + bounds.width + padding &&
+    point.y >= bounds.y - padding &&
+    point.y <= bounds.y + bounds.height + padding;
+}
+
+function hitTestObject(point) {
+  for (let index = objects.length - 1; index >= 0; index--) {
+    if (pointInBounds(point, objectBounds(objects[index]))) return objects[index];
+  }
+  return null;
+}
+
+function movePoint(point, dx, dy) {
+  point.x += dx;
+  point.y += dy;
+}
+
+function moveObject(item, dx, dy) {
+  if (item.type === 'pen') {
+    item.points.forEach((point) => movePoint(point, dx, dy));
+  } else if (item.start && item.end) {
+    movePoint(item.start, dx, dy);
+    movePoint(item.end, dx, dy);
+  } else if (item.start) {
+    movePoint(item.start, dx, dy);
+  }
 }
 
 function drawArrow(from, to, color, width) {
@@ -174,10 +385,36 @@ function drawObject(item) {
     ctx.fill();
     ctx.strokeStyle = item.color;
     ctx.stroke();
+  } else if (item.type === 'blur') {
+    const x = Math.min(item.start.x, item.end.x);
+    const y = Math.min(item.start.y, item.end.y);
+    const width = Math.abs(item.end.x - item.start.x);
+    const height = Math.abs(item.end.y - item.start.y);
+    const cell = Math.max(10, item.width * 2);
+    ctx.fillStyle = 'rgba(12, 18, 28, 0.72)';
+    ctx.fillRect(x, y, width, height);
+    for (let yy = y; yy < y + height; yy += cell) {
+      for (let xx = x; xx < x + width; xx += cell) {
+        ctx.fillStyle = ((Math.floor(xx / cell) + Math.floor(yy / cell)) % 2 === 0)
+          ? 'rgba(255, 255, 255, 0.13)'
+          : 'rgba(98, 221, 234, 0.14)';
+        ctx.fillRect(xx, yy, Math.min(cell, x + width - xx), Math.min(cell, y + height - yy));
+      }
+    }
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.48)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, width, height);
   } else if (item.type === 'text') {
     ctx.font = `${Math.max(20, item.width * 5)}px Segoe UI`;
     ctx.lineWidth = Math.max(3, item.width);
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.strokeText(item.text, item.start.x, item.start.y);
+    ctx.fillStyle = item.color;
+    ctx.fillText(item.text, item.start.x, item.start.y);
+  } else if (item.type === 'formula') {
+    ctx.font = `italic ${Math.max(22, item.width * 5)}px "Cambria Math", Cambria, Georgia, serif`;
+    ctx.lineWidth = Math.max(3, item.width);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
     ctx.strokeText(item.text, item.start.x, item.start.y);
     ctx.fillStyle = item.color;
     ctx.fillText(item.text, item.start.x, item.start.y);
@@ -189,6 +426,15 @@ function redraw() {
   ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   objects.forEach(drawObject);
   if (activeObject) drawObject(activeObject);
+  if (moveTarget) {
+    const bounds = objectBounds(moveTarget);
+    ctx.save();
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = 'rgba(98, 221, 234, 0.9)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(bounds.x - 6, bounds.y - 6, bounds.width + 12, bounds.height + 12);
+    ctx.restore();
+  }
 }
 
 function currentStyle() {
@@ -202,14 +448,19 @@ function beginObject(event) {
   if (!inputEnabled || event.target !== canvas) return;
   const start = pointFromEvent(event);
   const style = currentStyle();
+
+  if (activeTool === 'move') {
+    moveTarget = hitTestObject(start);
+    moveLastPoint = moveTarget ? start : null;
+    drawing = Boolean(moveTarget);
+    redraw();
+    return;
+  }
+
   drawing = true;
 
-  if (activeTool === 'text') {
-    const text = window.prompt('Text label');
-    if (text && text.trim()) {
-      objects.push({ type: 'text', start, text: text.trim(), ...style });
-      redraw();
-    }
+  if (activeTool === 'text' || activeTool === 'formula') {
+    positionTextEditor(start, activeTool);
     drawing = false;
     return;
   }
@@ -221,14 +472,28 @@ function beginObject(event) {
 }
 
 function updateObject(event) {
-  if (!inputEnabled || !drawing || !activeObject) return;
+  if (!inputEnabled || !drawing) return;
   const point = pointFromEvent(event);
+  if (activeTool === 'move' && moveTarget && moveLastPoint) {
+    moveObject(moveTarget, point.x - moveLastPoint.x, point.y - moveLastPoint.y);
+    moveLastPoint = point;
+    redraw();
+    return;
+  }
+  if (!activeObject) return;
   if (activeObject.type === 'pen') activeObject.points.push(point);
   else activeObject.end = point;
   redraw();
 }
 
 function commitObject() {
+  if (activeTool === 'move') {
+    drawing = false;
+    moveLastPoint = null;
+    redraw();
+    scheduleAutoHide();
+    return;
+  }
   if (!drawing || !activeObject) return;
   objects.push(activeObject);
   activeObject = null;
@@ -239,15 +504,115 @@ function commitObject() {
 
 function selectTool(tool) {
   activeTool = tool;
-  document.querySelectorAll('.tool').forEach((button) => {
+  document.body.classList.toggle('move-mode', tool === 'move');
+  if (tool !== 'move') {
+    moveTarget = null;
+    moveLastPoint = null;
+    redraw();
+  }
+  document.querySelectorAll('.tool, .supplement-tool').forEach((button) => {
     button.classList.toggle('active', button.dataset.tool === tool);
   });
+  if (tool === 'blur' || tool === 'formula') toggleSupplementPanel(true);
 }
 
 toolbar.addEventListener('click', (event) => {
   wakeToolbar();
   const button = event.target.closest('.tool');
   if (button) selectTool(button.dataset.tool);
+});
+
+supplementToggle.addEventListener('click', () => toggleSupplementPanel());
+
+supplementPanel.addEventListener('click', (event) => {
+  wakeToolbar();
+  const button = event.target.closest('.supplement-tool');
+  if (button) selectTool(button.dataset.tool);
+});
+
+youtubeTool.addEventListener('click', openYouTubePlayer);
+
+textEditorInsert.addEventListener('click', insertPendingText);
+textEditorCancel.addEventListener('click', closeTextEditor);
+textEditorInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    insertPendingText();
+  } else if (event.key === 'Escape') {
+    closeTextEditor();
+  }
+});
+
+youtubeLoad.addEventListener('click', loadYouTubeVideo);
+youtubeUrl.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    loadYouTubeVideo();
+  }
+});
+youtubeClose.addEventListener('click', () => {
+  youtubeFrame.src = 'about:blank';
+  youtubePlayer.classList.add('hidden');
+  youtubePlayer.classList.remove('fullscreen');
+});
+youtubeFullscreen.addEventListener('click', () => {
+  youtubePlayer.classList.toggle('fullscreen');
+  youtubeFullscreen.textContent = youtubePlayer.classList.contains('fullscreen') ? 'Restore' : 'Full';
+});
+
+youtubeHeader.addEventListener('pointerdown', (event) => {
+  if (youtubePlayer.classList.contains('fullscreen')) return;
+  const rect = youtubePlayer.getBoundingClientRect();
+  youtubeMove = {
+    pointerId: event.pointerId,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top,
+    width: rect.width,
+    height: rect.height
+  };
+  youtubeHeader.setPointerCapture(event.pointerId);
+});
+
+youtubeHeader.addEventListener('pointermove', (event) => {
+  if (!youtubeMove || youtubeMove.pointerId !== event.pointerId) return;
+  event.preventDefault();
+  applyYouTubeBounds(event.clientX - youtubeMove.offsetX, event.clientY - youtubeMove.offsetY, youtubeMove.width, youtubeMove.height);
+});
+
+youtubeHeader.addEventListener('pointerup', (event) => {
+  if (!youtubeMove || youtubeMove.pointerId !== event.pointerId) return;
+  youtubeMove = null;
+});
+
+youtubeResize.addEventListener('pointerdown', (event) => {
+  if (youtubePlayer.classList.contains('fullscreen')) return;
+  const rect = youtubePlayer.getBoundingClientRect();
+  youtubeSize = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height
+  };
+  youtubeResize.setPointerCapture(event.pointerId);
+});
+
+youtubeResize.addEventListener('pointermove', (event) => {
+  if (!youtubeSize || youtubeSize.pointerId !== event.pointerId) return;
+  event.preventDefault();
+  applyYouTubeBounds(
+    youtubeSize.left,
+    youtubeSize.top,
+    youtubeSize.width + event.clientX - youtubeSize.startX,
+    youtubeSize.height + event.clientY - youtubeSize.startY
+  );
+});
+
+youtubeResize.addEventListener('pointerup', (event) => {
+  if (!youtubeSize || youtubeSize.pointerId !== event.pointerId) return;
+  youtubeSize = null;
 });
 
 toolbar.addEventListener('pointerenter', wakeToolbar);
@@ -314,7 +679,9 @@ closeButton.addEventListener('click', () => {
 });
 
 window.addEventListener('keydown', (event) => {
-  if (event.ctrlKey && event.key.toLowerCase() === 'z') {
+  if (!textEditor.classList.contains('hidden') && event.key === 'Escape') {
+    closeTextEditor();
+  } else if (event.ctrlKey && event.key.toLowerCase() === 'z') {
     event.preventDefault();
     undoObject();
   } else if (event.key === 'Delete') {
@@ -346,7 +713,8 @@ applyInputMode(true);
 scheduleAutoHide();
 window.screenStudioAnnotation.ready({
   ready: true,
-  tools: Array.from(document.querySelectorAll('.tool')).map((button) => button.dataset.tool),
+  tools: Array.from(document.querySelectorAll('.tool, .supplement-tool')).map((button) => button.dataset.tool),
+  supplementary: ['blur', 'formula', 'youtube'],
   inputModes: ['annotate', 'navigate'],
   autoHide: Boolean(collapsedTool),
   undo: Boolean(undoButton),
