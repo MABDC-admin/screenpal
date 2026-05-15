@@ -9,7 +9,6 @@
     "src/annotation/**/*",
     "src/annotation-app/**/*",
     "src/main/annotation-preload.js",
-    "src/assets/icon.*",
     "package.json"
   ],
   "extraMetadata": {
@@ -18,7 +17,7 @@
   },
   "asar": true,
   "win": {
-    "icon": "build/icon.ico",
+    "icon": "src/annotation-app/assets/icon.ico",
     "target": [
       "portable"
     ]

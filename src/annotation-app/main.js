@@ -1,9 +1,11 @@
 const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, screen, globalShortcut } = require('electron');
+const fs = require('fs');
 const path = require('path');
 
 const appBrandName = 'M.A Brain Annotation Tools';
-const appIconPngPath = path.join(__dirname, '..', 'assets', 'icon.png');
-const appIconIcoPath = path.join(__dirname, '..', 'assets', 'icon.ico');
+const appLogoPath = path.join(__dirname, 'assets', 'mabdc-logo-circle.png');
+const appIconPngPath = path.join(__dirname, 'assets', 'icon.png');
+const appIconIcoPath = path.join(__dirname, 'assets', 'icon.ico');
 
 let annotationWindow;
 let controlWindow;
@@ -13,6 +15,15 @@ let inputEnabled = true;
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
+
+function logoDataUri() {
+  try {
+    const buffer = fs.readFileSync(appLogoPath);
+    return `data:image/png;base64,${buffer.toString('base64')}`;
+  } catch {
+    return '';
+  }
+}
 
 function closeControlWindow() {
   const target = controlWindow;
@@ -56,12 +67,13 @@ function showControlWindow() {
     <meta charset="utf-8" />
     <style>
       html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; font-family: Segoe UI, Arial, sans-serif; }
-      button { width: 76px; height: 44px; margin: 6px; border: 1px solid rgba(98, 221, 234, 0.86); border-radius: 999px; background: rgba(35, 138, 154, 0.96); color: white; font-size: 12px; font-weight: 900; box-shadow: 0 14px 40px rgba(0,0,0,.28); }
+      button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 76px; height: 44px; margin: 6px; border: 1px solid rgba(98, 221, 234, 0.86); border-radius: 999px; background: rgba(35, 138, 154, 0.96); color: white; font-size: 12px; font-weight: 900; box-shadow: 0 14px 40px rgba(0,0,0,.28); }
+      img { width: 22px; height: 22px; border-radius: 999px; background: white; object-fit: cover; }
       button:hover { background: rgba(45, 164, 181, 0.98); }
     </style>
   </head>
   <body>
-    <button id="tools" type="button" title="Turn annotation tools on">Tools</button>
+    <button id="tools" type="button" title="Turn annotation tools on"><img src="${logoDataUri()}" alt="" />Tools</button>
     <script>
       document.getElementById('tools').addEventListener('click', () => {
         window.screenStudioAnnotation.setInputMode(true);

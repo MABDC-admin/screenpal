@@ -55,8 +55,10 @@ async function main() {
   const sourcePath = path.join(root, 'src', 'renderer', 'assets', 'mabdc-logo-circle.png');
   const buildDir = path.join(root, 'build');
   const appAssetDir = path.join(root, 'src', 'assets');
+  const annotationAssetDir = path.join(root, 'src', 'annotation-app', 'assets');
   await fs.mkdir(buildDir, { recursive: true });
   await fs.mkdir(appAssetDir, { recursive: true });
+  await fs.mkdir(annotationAssetDir, { recursive: true });
 
   const source = PNG.sync.read(await fs.readFile(sourcePath));
   const icon = resizeCover(source, 256);
@@ -65,12 +67,18 @@ async function main() {
   const buildIcoPath = path.join(buildDir, 'icon.ico');
   const appPngPath = path.join(appAssetDir, 'icon.png');
   const appIcoPath = path.join(appAssetDir, 'icon.ico');
+  const annotationLogoPath = path.join(annotationAssetDir, 'mabdc-logo-circle.png');
+  const annotationPngPath = path.join(annotationAssetDir, 'icon.png');
+  const annotationIcoPath = path.join(annotationAssetDir, 'icon.ico');
 
   await fs.writeFile(buildPngPath, pngBuffer);
   await fs.writeFile(appPngPath, pngBuffer);
+  await fs.writeFile(annotationPngPath, pngBuffer);
+  await fs.copyFile(sourcePath, annotationLogoPath);
   const icoBuffer = await pngToIco(buildPngPath);
   await fs.writeFile(buildIcoPath, icoBuffer);
   await fs.writeFile(appIcoPath, icoBuffer);
+  await fs.writeFile(annotationIcoPath, icoBuffer);
 }
 
 main().catch((error) => {

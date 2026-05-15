@@ -22,8 +22,10 @@ body {
   right: 24px;
   top: 24px;
   z-index: 11;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   width: 64px;
   min-width: 64px;
   height: 46px;
@@ -36,6 +38,15 @@ body {
   pointer-events: none;
   transform: translateY(-8px) scale(0.92);
   transition: opacity 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.collapsed-logo {
+  display: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  object-fit: cover;
+  background: #ffffff;
 }
 
 .collapsed-tool:hover {
@@ -60,6 +71,29 @@ body {
   backdrop-filter: blur(14px);
   opacity: 1;
   transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.annotation-brand {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px 0 6px;
+  border: 1px solid rgba(98, 221, 234, 0.36);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.annotation-brand img {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  object-fit: cover;
+  background: #ffffff;
 }
 
 body.toolbar-collapsed .toolbar {
@@ -129,6 +163,19 @@ button.danger {
 body.standalone-mode #stop {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.18);
+}
+
+body.standalone-mode .annotation-brand {
+  display: inline-flex;
+}
+
+body.standalone-mode .collapsed-tool {
+  width: 92px;
+  min-width: 92px;
+}
+
+body.standalone-mode .collapsed-logo {
+  display: block;
 }
 
 .color-field,
