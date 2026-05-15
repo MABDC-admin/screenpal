@@ -161,6 +161,7 @@ body {
   border-radius: 12px;
   background: rgba(6, 10, 16, 0.96);
   box-shadow: 0 20px 80px rgba(0, 0, 0, 0.38);
+  pointer-events: auto;
 }
 
 .youtube-player.fullscreen {
@@ -171,6 +172,8 @@ body {
 }
 
 .youtube-header {
+  position: relative;
+  z-index: 2;
   height: 42px;
   display: flex;
   align-items: center;
@@ -186,6 +189,8 @@ body {
 }
 
 .youtube-actions {
+  position: relative;
+  z-index: 3;
   display: flex;
   gap: 6px;
 }
@@ -199,6 +204,8 @@ body {
 }
 
 .youtube-player iframe {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   height: calc(100% - 94px);
@@ -278,6 +285,7 @@ body.navigation-mode .supplement-tool,
 body.navigation-mode .color-field,
 body.navigation-mode .size-field,
 body.navigation-mode #undo,
+body.navigation-mode #deleteObject,
 body.navigation-mode #clear {
   opacity: 0.5;
 }

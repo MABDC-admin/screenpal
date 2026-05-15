@@ -5,6 +5,7 @@ const inputModeButton = document.getElementById('inputMode');
 const colorInput = document.getElementById('color');
 const strokeSizeInput = document.getElementById('strokeSize');
 const undoButton = document.getElementById('undo');
+const deleteObjectButton = document.getElementById('deleteObject');
 const clearButton = document.getElementById('clear');
 const stopButton = document.getElementById('stop');
 const closeButton = document.getElementById('close');
@@ -184,7 +185,17 @@ function loadYouTubeVideo() {
     youtubeUrl.focus();
     return;
   }
-  youtubeFrame.src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&rel=0&modestbranding=1`;
+  youtubeFrame.src = `https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1&rel=0&modestbranding=1&origin=https%3A%2F%2Fwww.youtube.com`;
+}
+
+function closeYouTubePlayer() {
+  youtubeMove = null;
+  youtubeSize = null;
+  youtubeFrame.src = 'about:blank';
+  youtubePlayer.classList.add('hidden');
+  youtubePlayer.classList.remove('fullscreen');
+  youtubeFullscreen.textContent = 'Full';
+  wakeToolbar();
 }
 
 function applyYouTubeBounds(left, top, width, height) {
@@ -198,9 +209,24 @@ function applyYouTubeBounds(left, top, width, height) {
 function clearObjects() {
   objects.length = 0;
   activeObject = null;
+  moveTarget = null;
+  moveLastPoint = null;
   closeTextEditor();
   redraw();
   wakeToolbar();
+}
+
+function deleteSelectedObject() {
+  if (!moveTarget) return false;
+  const index = objects.indexOf(moveTarget);
+  if (index < 0) return false;
+  objects.splice(index, 1);
+  moveTarget = null;
+  moveLastPoint = null;
+  drawing = false;
+  redraw();
+  wakeToolbar();
+  return true;
 }
 
 function undoObject() {
@@ -550,10 +576,13 @@ youtubeUrl.addEventListener('keydown', (event) => {
     loadYouTubeVideo();
   }
 });
-youtubeClose.addEventListener('click', () => {
-  youtubeFrame.src = 'about:blank';
-  youtubePlayer.classList.add('hidden');
-  youtubePlayer.classList.remove('fullscreen');
+youtubeClose.addEventListener('pointerdown', (event) => {
+  event.stopPropagation();
+});
+youtubeClose.addEventListener('click', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  closeYouTubePlayer();
 });
 youtubeFullscreen.addEventListener('click', () => {
   youtubePlayer.classList.toggle('fullscreen');
@@ -670,6 +699,10 @@ clearButton.addEventListener('click', () => {
   clearObjects();
 });
 
+deleteObjectButton.addEventListener('click', () => {
+  deleteSelectedObject();
+});
+
 stopButton.addEventListener('click', () => {
   window.screenStudioAnnotation.stopRecording();
 });
@@ -685,9 +718,10 @@ window.addEventListener('keydown', (event) => {
     event.preventDefault();
     undoObject();
   } else if (event.key === 'Delete') {
-    clearObjects();
+    if (!deleteSelectedObject()) clearObjects();
   } else if (event.key === 'Escape') {
-    setInputMode(false);
+    if (!youtubePlayer.classList.contains('hidden')) closeYouTubePlayer();
+    else setInputMode(false);
   } else if (event.key.toLowerCase() === 'a') {
     setInputMode(!inputEnabled);
   }
@@ -718,5 +752,6 @@ window.screenStudioAnnotation.ready({
   inputModes: ['annotate', 'navigate'],
   autoHide: Boolean(collapsedTool),
   undo: Boolean(undoButton),
+  deleteObject: Boolean(deleteObjectButton),
   clear: Boolean(clearButton)
 });

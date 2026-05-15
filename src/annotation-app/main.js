@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, screen, globalShortcut } = require('electron');
+const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, screen, globalShortcut, session } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -16,6 +16,25 @@ let controlWindowPosition = null;
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
+
+function configureYouTubeEmbedding() {
+  const filter = {
+    urls: [
+      '*://*.youtube.com/*',
+      '*://*.youtube-nocookie.com/*',
+      '*://*.googlevideo.com/*',
+      '*://*.ytimg.com/*'
+    ]
+  };
+  session.defaultSession.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
+    const requestHeaders = {
+      ...details.requestHeaders,
+      Referer: 'https://www.youtube.com/',
+      Origin: 'https://www.youtube.com'
+    };
+    callback({ requestHeaders });
+  });
+}
 
 function logoDataUri() {
   try {
@@ -274,6 +293,7 @@ ipcMain.handle('annotation:ready', (_event, metrics) => {
 });
 
 app.whenReady().then(() => {
+  configureYouTubeEmbedding();
   createMenu();
   createTray();
   createAnnotationWindow();
