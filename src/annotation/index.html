@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'"
+    />
+    <title>Recording Annotations</title>
+    <link rel="stylesheet" href="./annotation.css" />
+  </head>
+  <body>
+    <canvas id="drawCanvas" aria-label="Recording annotation canvas"></canvas>
+    <div id="toolbar" class="toolbar" role="toolbar" aria-label="Recording annotation tools">
+      <button class="tool active" type="button" data-tool="pen" title="Pen">Pen</button>
+      <button class="tool" type="button" data-tool="arrow" title="Arrow">Arrow</button>
+      <button class="tool" type="button" data-tool="rect" title="Rectangle">Rect</button>
+      <button class="tool" type="button" data-tool="ellipse" title="Circle or ellipse">Circle</button>
+      <button class="tool" type="button" data-tool="spotlight" title="Pointer spotlight">Pointer</button>
+      <button class="tool" type="button" data-tool="text" title="Text label">Text</button>
+      <label class="color-field" title="Annotation color">
+        <span>Color</span>
+        <input id="color" type="color" value="#ff2d55" />
+      </label>
+      <label class="size-field" title="Stroke size">
+        <span>Size</span>
+        <input id="strokeSize" type="range" min="2" max="20" value="6" />
+      </label>
+      <button id="undo" type="button" title="Undo last object">Undo</button>
+      <button id="clear" type="button" title="Clear all objects">Clear</button>
+      <button id="stop" class="danger" type="button" title="Stop recording">Stop Rec</button>
+      <button id="close" type="button" title="Close annotation tools">Close Tools</button>
+    </div>
+    <script src="./annotation.js"></script>
+  </body>
+</html>

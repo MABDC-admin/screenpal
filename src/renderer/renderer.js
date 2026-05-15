@@ -118,6 +118,7 @@ let nativeAudioStartedAt = 0;
 let nativeAudioFlags = null;
 let jobHideTimer = null;
 let lastCountdownCheck = null;
+let lastAnnotationCheck = null;
 const selfTestMode = new URLSearchParams(window.location.search).get('selftest') === '1';
 const projectBrowserHeightKey = 'screenStudio.projectBrowserHeight';
 const previewHeightKey = 'screenStudio.previewHeight';
@@ -931,6 +932,22 @@ function previewTimelineMetrics() {
   };
 }
 
+function verifyAnnotationTools(metrics) {
+  const tools = metrics?.tools || [];
+  const required = ['pen', 'arrow', 'rect', 'ellipse', 'spotlight', 'text'];
+  const result = {
+    ready: Boolean(metrics?.ready),
+    tools,
+    undo: Boolean(metrics?.undo),
+    clear: Boolean(metrics?.clear),
+    skippedForSelfTest: Boolean(metrics?.skippedForSelfTest)
+  };
+  if (!result.ready || !result.undo || !result.clear || required.some((tool) => !tools.includes(tool))) {
+    throw new Error(`Annotation tools are not ready: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
 function miniRecorderMetrics() {
   const rect = miniRecorder.getBoundingClientRect();
   const stopRect = miniStopCapture.getBoundingClientRect();
@@ -1577,8 +1594,12 @@ async function beginNativeRecording() {
   timerHandle = setInterval(updateTimer, 250);
   setRecordingState('recording');
   updateTimer();
+  lastAnnotationCheck = await window.screenStudio.showAnnotations().catch((error) => ({
+    ready: false,
+    error: error.message || String(error)
+  }));
   if (companionAudio?.hasSystemAudio) {
-    setStatus(`Recording smooth desktop video · system sound ${companionAudio.hasMicAudio ? '+ microphone ' : ''}will be muxed into MP4`);
+    setStatus(`Recording smooth desktop video · annotation tools ready · system sound ${companionAudio.hasMicAudio ? '+ microphone ' : ''}will be muxed into MP4`);
   } else {
     setStatus(nativeCaptureSession.audioDevice
       ? `Recording FFmpeg desktop video · audio source: ${nativeCaptureSession.audioDevice} (${nativeCaptureSession.audioKind})`
@@ -1649,6 +1670,7 @@ async function stopRecording() {
     timerHandle = null;
     setStatus('Stopping FFmpeg recording...');
     try {
+      await window.screenStudio.closeAnnotations().catch(() => {});
       const companionAudio = await stopNativeCompanionAudio();
       const project = await window.screenStudio.stopNativeCapture(session.id, companionAudio);
       setRecordingState('idle');
@@ -1675,6 +1697,7 @@ async function stopRecording() {
         if (!lastCountdownCheck?.visible || !lastCountdownCheck.seconds || !/overlay/i.test(lastCountdownCheck.surface || '') || !lastCountdownCheck.closedBeforeCapture || lastCountdownCheck.settleMs < 500) {
           throw new Error(`Recording countdown overlay did not run: ${JSON.stringify(lastCountdownCheck)}`);
         }
+        const annotationTools = verifyAnnotationTools(lastAnnotationCheck);
         const fixedPreviewFrame = await verifyFixedPreviewFrame();
         const projectBrowserResize = await verifyProjectBrowserResize();
         const darkTheme = await verifyThemeToggle();
@@ -1750,6 +1773,7 @@ async function stopRecording() {
           frameRate: renamedProject.capture?.frameRate,
           videoCrf: renamedProject.capture?.videoCrf,
           countdownOverlay: lastCountdownCheck,
+          annotationTools,
           postRecordDialog,
           fixedPreviewFrame,
           projectBrowserResize,

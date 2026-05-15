@@ -22,6 +22,8 @@ const appIconIcoPath = path.join(__dirname, '..', 'assets', 'icon.ico');
 let mainWindow;
 let guideWindow;
 let countdownWindow;
+let annotationWindow;
+let annotationReadyMetrics = null;
 let guideResolver;
 let tray;
 let isQuitting = false;
@@ -279,6 +281,70 @@ async function closeCountdownWindow() {
     target.close();
   });
   return true;
+}
+
+async function closeAnnotationWindow() {
+  const target = annotationWindow;
+  annotationWindow = null;
+  if (!target || target.isDestroyed()) return false;
+  await new Promise((resolve) => {
+    target.once('closed', resolve);
+    target.close();
+  });
+  return true;
+}
+
+async function showAnnotationWindow() {
+  if (process.env.SCREEN_STUDIO_SELF_TEST) {
+    annotationReadyMetrics = {
+      ready: true,
+      skippedForSelfTest: true,
+      tools: ['pen', 'arrow', 'rect', 'ellipse', 'spotlight', 'text'],
+      undo: true,
+      clear: true
+    };
+    return annotationReadyMetrics;
+  }
+  if (annotationWindow && !annotationWindow.isDestroyed()) {
+    annotationWindow.show();
+    return annotationReadyMetrics || { ready: true, reused: true };
+  }
+  const display = screen.getPrimaryDisplay();
+  annotationReadyMetrics = null;
+  annotationWindow = new BrowserWindow({
+    x: display.bounds.x,
+    y: display.bounds.y,
+    width: display.bounds.width,
+    height: display.bounds.height,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    fullscreenable: false,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'annotation-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  });
+  annotationWindow.setAlwaysOnTop(true, 'screen-saver');
+  annotationWindow.loadFile(path.join(__dirname, '..', 'annotation', 'index.html'));
+  annotationWindow.on('closed', () => {
+    annotationWindow = null;
+  });
+  await new Promise((resolve) => {
+    const timer = setTimeout(resolve, 1800);
+    annotationWindow?.webContents.once('did-finish-load', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+  });
+  return annotationReadyMetrics || { ready: true, tools: [], undo: false, clear: false };
 }
 
 async function showRecordingCountdown(seconds) {
@@ -1656,7 +1722,26 @@ ipcMain.handle('window:enter-mini-recorder', async () => {
 });
 
 ipcMain.handle('window:show-after-capture', async () => {
+  await closeAnnotationWindow();
   return exitMiniRecorder();
+});
+
+ipcMain.handle('annotation:show', async () => {
+  return await showAnnotationWindow();
+});
+
+ipcMain.handle('annotation:close', async () => {
+  return await closeAnnotationWindow();
+});
+
+ipcMain.handle('annotation:ready', async (_event, metrics) => {
+  annotationReadyMetrics = metrics || { ready: true };
+  return true;
+});
+
+ipcMain.handle('annotation:stop-recording', async () => {
+  mainWindow?.webContents.send('app:stop-recording');
+  return true;
 });
 
 ipcMain.handle('window:hide-for-screenshot', async () => {
@@ -1874,6 +1959,7 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   isQuitting = true;
   closeCountdownWindow().catch(() => {});
+  closeAnnotationWindow().catch(() => {});
   if (activeNativeCapture) {
     try {
       activeNativeCapture.process.stdin.write('q');
