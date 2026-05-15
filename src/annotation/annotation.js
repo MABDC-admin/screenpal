@@ -36,7 +36,6 @@ let drawing = false;
 let dpr = 1;
 let inputEnabled = true;
 let toolbarCollapsed = false;
-let autoHideTimer = null;
 let toolbarDrag = null;
 let moveTarget = null;
 let moveLastPoint = null;
@@ -50,9 +49,7 @@ function setToolbarCollapsed(collapsed) {
 }
 
 function scheduleAutoHide() {
-  clearTimeout(autoHideTimer);
-  if (!inputEnabled || drawing) return;
-  autoHideTimer = setTimeout(() => setToolbarCollapsed(true), 4500);
+  setToolbarCollapsed(false);
 }
 
 function wakeToolbar() {
@@ -750,7 +747,7 @@ window.screenStudioAnnotation.ready({
   tools: Array.from(document.querySelectorAll('.tool, .supplement-tool')).map((button) => button.dataset.tool),
   supplementary: ['blur', 'formula', 'youtube'],
   inputModes: ['annotate', 'navigate'],
-  autoHide: Boolean(collapsedTool),
+  autoHide: false,
   undo: Boolean(undoButton),
   deleteObject: Boolean(deleteObjectButton),
   clear: Boolean(clearButton)
