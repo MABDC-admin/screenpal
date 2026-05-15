@@ -1,6 +1,6 @@
 {
   "name": "screenpal-cleanroom-clone",
-  "version": "0.9.27",
+  "version": "0.9.28",
   "private": true,
   "description": "Production desktop screen recorder/editor built as a clean-room ScreenPal-style application.",
   "author": "MABDC",
@@ -8,9 +8,12 @@
   "scripts": {
     "prepack": "node scripts/generate-icon.js",
     "predist": "node scripts/generate-icon.js",
+    "predist:annotation": "node scripts/generate-icon.js",
     "start": "electron .",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder --win nsis portable"
+    "dist:studio": "electron-builder --win nsis portable",
+    "dist:annotation": "electron-builder --config electron-builder.annotation.json --win portable",
+    "dist": "npm run dist:studio && npm run dist:annotation"
   },
   "build": {
     "appId": "com.mabdc.screenstudio",

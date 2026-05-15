@@ -7,5 +7,8 @@ contextBridge.exposeInMainWorld('screenStudioAnnotation', {
   ready: (metrics) => ipcRenderer.invoke('annotation:ready', metrics),
   onInputModeChange: (callback) => {
     ipcRenderer.on('annotation:input-mode', (_event, enabled) => callback(Boolean(enabled)));
+  },
+  onClear: (callback) => {
+    ipcRenderer.on('annotation:clear', () => callback());
   }
 });

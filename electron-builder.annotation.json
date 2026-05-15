@@ -1,0 +1,29 @@
+{
+  "appId": "com.mabdc.screenstudio.annotation",
+  "productName": "Annotation Tools",
+  "artifactName": "${productName} ${version}.${ext}",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "src/annotation/**/*",
+    "src/annotation-app/**/*",
+    "src/main/annotation-preload.js",
+    "src/assets/icon.*",
+    "package.json"
+  ],
+  "extraMetadata": {
+    "name": "screen-studio-annotation-tools",
+    "main": "src/annotation-app/main.js"
+  },
+  "asar": true,
+  "win": {
+    "icon": "build/icon.ico",
+    "target": [
+      "portable"
+    ]
+  },
+  "portable": {
+    "artifactName": "Annotation Tools ${version}.${ext}"
+  }
+}

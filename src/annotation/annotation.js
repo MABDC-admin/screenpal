@@ -8,6 +8,7 @@ const undoButton = document.getElementById('undo');
 const clearButton = document.getElementById('clear');
 const stopButton = document.getElementById('stop');
 const closeButton = document.getElementById('close');
+const standaloneMode = new URLSearchParams(window.location.search).get('standalone') === '1';
 
 const ctx = canvas.getContext('2d');
 const objects = [];
@@ -33,6 +34,19 @@ function scheduleAutoHide() {
 function wakeToolbar() {
   setToolbarCollapsed(false);
   scheduleAutoHide();
+}
+
+function clearObjects() {
+  objects.length = 0;
+  activeObject = null;
+  redraw();
+  wakeToolbar();
+}
+
+function undoObject() {
+  objects.pop();
+  redraw();
+  wakeToolbar();
 }
 
 function applyInputMode(enabled) {
@@ -215,16 +229,11 @@ canvas.addEventListener('pointerup', commitObject);
 canvas.addEventListener('pointerleave', commitObject);
 
 undoButton.addEventListener('click', () => {
-  objects.pop();
-  redraw();
-  wakeToolbar();
+  undoObject();
 });
 
 clearButton.addEventListener('click', () => {
-  objects.length = 0;
-  activeObject = null;
-  redraw();
-  wakeToolbar();
+  clearObjects();
 });
 
 stopButton.addEventListener('click', () => {
@@ -238,13 +247,9 @@ closeButton.addEventListener('click', () => {
 window.addEventListener('keydown', (event) => {
   if (event.ctrlKey && event.key.toLowerCase() === 'z') {
     event.preventDefault();
-    objects.pop();
-    redraw();
-    wakeToolbar();
+    undoObject();
   } else if (event.key === 'Delete') {
-    objects.length = 0;
-    redraw();
-    wakeToolbar();
+    clearObjects();
   } else if (event.key === 'Escape') {
     setInputMode(false);
   } else if (event.key.toLowerCase() === 'a') {
@@ -256,7 +261,15 @@ window.addEventListener('resize', resizeCanvas);
 window.screenStudioAnnotation.onInputModeChange((enabled) => {
   applyInputMode(enabled);
 });
+window.screenStudioAnnotation.onClear(clearObjects);
 resizeCanvas();
+if (standaloneMode) {
+  document.body.classList.add('standalone-mode');
+  document.title = 'Annotation Tools';
+  stopButton.textContent = 'Hide';
+  stopButton.title = 'Hide annotation tools';
+  closeButton.textContent = 'Navigate';
+}
 applyInputMode(true);
 scheduleAutoHide();
 window.screenStudioAnnotation.ready({
