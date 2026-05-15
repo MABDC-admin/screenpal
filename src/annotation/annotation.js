@@ -38,7 +38,8 @@ const standaloneMode = new URLSearchParams(window.location.search).get('standalo
 const ctx = canvas.getContext('2d');
 const objects = [];
 const toolbarPositionKey = 'screenStudioAnnotationToolbarPosition';
-const toolbarEdgeThreshold = 84;
+const toolbarDockEnterThreshold = 72;
+const toolbarDockExitThreshold = 132;
 const emojiGroups = {
   Smileys: '😀 😃 😄 😁 😆 😅 😂 🤣 🥲 ☺️ 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🥸 🤩 🥳 😏 😒 😞 😔 😟 😕 🙁 ☹️ 😣 😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🫣 🤗 🫡 🤔 🫢 🤭 🤫 🤥 😶 😶‍🌫️ 😐 😑 😬 🫨 🙄 😯 😦 😧 😮 😲 🥱 😴 🤤 😪 😮‍💨 😵 😵‍💫 🤐 🥴 🤢 🤮 🤧 😷 🤒 🤕 🤑 🤠'.split(' '),
   People: '👋 🤚 🖐️ ✋ 🖖 🫱 🫲 🫳 🫴 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 🖕 👇 ☝️ 🫵 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🤝 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂 🦻 👃 🧠 🫀 🫁 🦷 🦴 👀 👁️ 👅 👄 🫦 👶 🧒 👦 👧 🧑 👱 👨 🧔 👩 🧓 👴 👵 🙍 🙎 🙅 🙆 💁 🙋 🧏 🙇 🤦 🤷'.split(' '),
@@ -90,12 +91,11 @@ function setToolbarCollapsed(collapsed) {
 }
 
 function scheduleAutoHide() {
-  setToolbarCollapsed(false);
+  // Auto-hide is disabled; only explicit Hide/Navigate actions collapse the toolbar.
 }
 
 function wakeToolbar() {
   setToolbarCollapsed(false);
-  scheduleAutoHide();
 }
 
 function clampToolbarPosition(left, top) {
@@ -107,10 +107,18 @@ function clampToolbarPosition(left, top) {
   };
 }
 
-function toolbarEdgeForPosition(left) {
+function toolbarEdgeForPosition(left, pointerX = null, preferredEdge = null) {
   const rect = toolbar.getBoundingClientRect();
-  if (left <= toolbarEdgeThreshold) return 'left';
-  if (left + rect.width >= window.innerWidth - toolbarEdgeThreshold) return 'right';
+  if (preferredEdge === 'left' || preferredEdge === 'right') return preferredEdge;
+  if (Number.isFinite(pointerX)) {
+    if (pointerX <= toolbarDockEnterThreshold) return 'left';
+    if (pointerX >= window.innerWidth - toolbarDockEnterThreshold) return 'right';
+    if (toolbar.dataset.edge === 'left' && pointerX <= toolbarDockExitThreshold) return 'left';
+    if (toolbar.dataset.edge === 'right' && pointerX >= window.innerWidth - toolbarDockExitThreshold) return 'right';
+    return null;
+  }
+  if (left <= toolbarDockEnterThreshold) return 'left';
+  if (left + rect.width >= window.innerWidth - toolbarDockEnterThreshold) return 'right';
   return null;
 }
 
@@ -119,13 +127,15 @@ function setToolbarOrientation(edge) {
   toolbar.classList.toggle('toolbar-vertical', Boolean(edge));
 }
 
-function applyToolbarPosition(left, top, save = true) {
+function applyToolbarPosition(left, top, save = true, options = {}) {
   toolbar.classList.add('toolbar-dragged');
-  const edge = toolbarEdgeForPosition(left);
+  const edge = toolbarEdgeForPosition(left, options.pointerX, options.edge);
   setToolbarOrientation(edge);
   if (edge === 'right') {
     const rect = toolbar.getBoundingClientRect();
     left = window.innerWidth - rect.width - 8;
+  } else if (edge === 'left') {
+    left = 8;
   }
   const position = clampToolbarPosition(left, top);
   toolbar.classList.add('toolbar-dragged');
@@ -134,16 +144,17 @@ function applyToolbarPosition(left, top, save = true) {
   toolbar.style.right = 'auto';
   toolbar.style.bottom = 'auto';
   toolbar.style.transform = 'none';
-  if (save) localStorage.setItem(toolbarPositionKey, JSON.stringify(position));
+  if (save) localStorage.setItem(toolbarPositionKey, JSON.stringify({ ...position, edge }));
   if (!supplementPanel.classList.contains('hidden')) positionSupplementPanel();
   if (!emojiPanel.classList.contains('hidden')) positionEmojiPanel();
+  return { ...position, edge };
 }
 
 function restoreToolbarPosition() {
   try {
     const saved = JSON.parse(localStorage.getItem(toolbarPositionKey) || 'null');
     if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) {
-      requestAnimationFrame(() => applyToolbarPosition(saved.left, saved.top, false));
+      requestAnimationFrame(() => applyToolbarPosition(saved.left, saved.top, false, { edge: saved.edge }));
     }
   } catch {
     localStorage.removeItem(toolbarPositionKey);
@@ -992,7 +1003,18 @@ toolbar.addEventListener('pointerdown', (event) => {
 toolbar.addEventListener('pointermove', (event) => {
   if (!toolbarDrag || toolbarDrag.pointerId !== event.pointerId) return;
   event.preventDefault();
-  applyToolbarPosition(event.clientX - toolbarDrag.offsetX, event.clientY - toolbarDrag.offsetY);
+  const previousEdge = toolbar.dataset.edge || '';
+  const position = applyToolbarPosition(
+    event.clientX - toolbarDrag.offsetX,
+    event.clientY - toolbarDrag.offsetY,
+    true,
+    { pointerX: event.clientX }
+  );
+  if ((position.edge || '') !== previousEdge) {
+    const rect = toolbar.getBoundingClientRect();
+    toolbarDrag.offsetX = event.clientX - rect.left;
+    toolbarDrag.offsetY = event.clientY - rect.top;
+  }
 });
 
 toolbar.addEventListener('pointerup', (event) => {
@@ -1007,7 +1029,6 @@ toolbar.addEventListener('pointercancel', () => {
 });
 canvas.addEventListener('pointermove', () => {
   if (toolbarCollapsed || drawing) return;
-  scheduleAutoHide();
 });
 
 collapsedTool.addEventListener('click', wakeToolbar);
@@ -1081,7 +1102,6 @@ renderEmojiCategories();
 renderAnimatedEmojiRow();
 renderEmojiGrid();
 applyInputMode(true);
-scheduleAutoHide();
 window.screenStudioAnnotation.ready({
   ready: true,
   tools: Array.from(document.querySelectorAll('.tool, .supplement-tool')).map((button) => button.dataset.tool),
