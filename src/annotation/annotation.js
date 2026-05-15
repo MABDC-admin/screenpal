@@ -1003,7 +1003,7 @@ closeButton.addEventListener('click', () => {
 });
 
 toolbarCloseButton.addEventListener('click', () => {
-  setInputMode(false);
+  window.screenStudioAnnotation.close();
 });
 
 window.addEventListener('keydown', (event) => {

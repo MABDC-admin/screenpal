@@ -281,7 +281,9 @@ function createMenu() {
 ipcMain.handle('annotation:set-input-mode', (_event, enabled) => setInputMode(enabled));
 ipcMain.handle('annotation:move-control-window', (_event, deltaX, deltaY) => moveControlWindow(deltaX, deltaY));
 ipcMain.handle('annotation:close', () => {
-  hideTools();
+  isQuitting = true;
+  closeControlWindow();
+  app.quit();
   return true;
 });
 ipcMain.handle('annotation:stop-recording', () => {
