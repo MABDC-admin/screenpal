@@ -232,7 +232,7 @@ stopButton.addEventListener('click', () => {
 });
 
 closeButton.addEventListener('click', () => {
-  window.screenStudioAnnotation.close();
+  setInputMode(false);
 });
 
 window.addEventListener('keydown', (event) => {
@@ -246,7 +246,7 @@ window.addEventListener('keydown', (event) => {
     redraw();
     wakeToolbar();
   } else if (event.key === 'Escape') {
-    window.screenStudioAnnotation.close();
+    setInputMode(false);
   } else if (event.key.toLowerCase() === 'a') {
     setInputMode(!inputEnabled);
   }

@@ -1036,7 +1036,12 @@ async function setAnnotationInput(enabled) {
   annotationInputEnabled = Boolean(enabled);
   syncMiniAnnotationButton();
   if (selfTestMode) return { enabled: annotationInputEnabled, selfTest: true };
-  return await window.screenStudio.setAnnotationInputMode(annotationInputEnabled);
+  const result = await window.screenStudio.setAnnotationInputMode(annotationInputEnabled);
+  if (annotationInputEnabled && result?.missing) {
+    const reopened = await window.screenStudio.showAnnotations();
+    return { ...reopened, reopened: true };
+  }
+  return result;
 }
 
 function playbackControlsVisible() {
