@@ -9,6 +9,14 @@ const deleteObjectButton = document.getElementById('deleteObject');
 const clearButton = document.getElementById('clear');
 const stopButton = document.getElementById('stop');
 const closeButton = document.getElementById('close');
+const toolbarCloseButton = document.getElementById('toolbarClose');
+const emojiToggle = document.getElementById('emojiToggle');
+const emojiPanel = document.getElementById('emojiPanel');
+const emojiSearch = document.getElementById('emojiSearch');
+const emojiPanelClose = document.getElementById('emojiPanelClose');
+const emojiCategories = document.getElementById('emojiCategories');
+const animatedEmojiRow = document.getElementById('animatedEmojiRow');
+const emojiGrid = document.getElementById('emojiGrid');
 const supplementToggle = document.getElementById('supplementToggle');
 const supplementPanel = document.getElementById('supplementPanel');
 const youtubeTool = document.getElementById('youtubeTool');
@@ -30,6 +38,31 @@ const standaloneMode = new URLSearchParams(window.location.search).get('standalo
 const ctx = canvas.getContext('2d');
 const objects = [];
 const toolbarPositionKey = 'screenStudioAnnotationToolbarPosition';
+const emojiGroups = {
+  Smileys: '😀 😃 😄 😁 😆 😅 😂 🤣 🥲 ☺️ 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🥸 🤩 🥳 😏 😒 😞 😔 😟 😕 🙁 ☹️ 😣 😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🫣 🤗 🫡 🤔 🫢 🤭 🤫 🤥 😶 😶‍🌫️ 😐 😑 😬 🫨 🙄 😯 😦 😧 😮 😲 🥱 😴 🤤 😪 😮‍💨 😵 😵‍💫 🤐 🥴 🤢 🤮 🤧 😷 🤒 🤕 🤑 🤠'.split(' '),
+  People: '👋 🤚 🖐️ ✋ 🖖 🫱 🫲 🫳 🫴 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 🖕 👇 ☝️ 🫵 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🤝 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂 🦻 👃 🧠 🫀 🫁 🦷 🦴 👀 👁️ 👅 👄 🫦 👶 🧒 👦 👧 🧑 👱 👨 🧔 👩 🧓 👴 👵 🙍 🙎 🙅 🙆 💁 🙋 🧏 🙇 🤦 🤷'.split(' '),
+  Animals: '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐻‍❄️ 🐨 🐯 🦁 🐮 🐷 🐽 🐸 🐵 🙈 🙉 🙊 🐒 🐔 🐧 🐦 🐤 🐣 🐥 🦆 🦅 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🪱 🐛 🦋 🐌 🐞 🐜 🪰 🪲 🪳 🦟 🦗 🕷️ 🦂 🐢 🐍 🦎 🦖 🦕 🐙 🦑 🦐 🦞 🦀 🪼 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🦭 🐊 🐅 🐆 🦓 🦍 🦧 🦣 🐘 🦛 🦏 🐪 🐫 🦒 🦘 🦬 🐃 🐂 🐄'.split(' '),
+  Food: '🍏 🍎 🍐 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍈 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🍆 🥑 🥦 🫛 🥬 🥒 🌶️ 🫑 🌽 🥕 🫒 🧄 🧅 🥔 🍠 🫚 🥐 🥯 🍞 🥖 🥨 🧀 🥚 🍳 🧈 🥞 🧇 🥓 🥩 🍗 🍖 🦴 🌭 🍔 🍟 🍕 🫓 🥪 🥙 🧆 🌮 🌯 🫔 🥗 🥘 🫕 🥫 🍝 🍜 🍲 🍛 🍣 🍱 🥟 🦪 🍤 🍙 🍚 🍘 🍥 🥠 🥮 🍢 🍡 🍧 🍨 🍦 🥧 🧁 🍰 🎂 🍮'.split(' '),
+  Travel: '🌍 🌎 🌏 🌐 🗺️ 🗾 🧭 🏔️ ⛰️ 🌋 🗻 🏕️ 🏖️ 🏜️ 🏝️ 🏞️ 🏟️ 🏛️ 🏗️ 🧱 🪨 🪵 🛖 🏘️ 🏚️ 🏠 🏡 🏢 🏣 🏤 🏥 🏦 🏨 🏩 🏪 🏫 🏬 🏭 🏯 🏰 💒 🗼 🗽 ⛪ 🕌 🛕 🕍 ⛩️ 🕋 ⛲ ⛺ 🌁 🌃 🏙️ 🌄 🌅 🌆 🌇 🌉 ♨️ 🎠 🛝 🎡 🎢 💈 🎪 🚂 🚆 🚇 🚊 🚉 ✈️ 🛫 🛬 🚀 🛸 🚁 🛶 ⛵ 🚤 🛳️'.split(' '),
+  Activities: '⚽ 🏀 🏈 ⚾ 🥎 🎾 🏐 🏉 🥏 🎱 🪀 🏓 🏸 🏒 🏑 🥍 🏏 🪃 🥅 ⛳ 🪁 🏹 🎣 🤿 🥊 🥋 🎽 🛹 🛼 🛷 ⛸️ 🥌 🎿 ⛷️ 🏂 🪂 🏋️ 🤼 🤸 ⛹️ 🤺 🤾 🏌️ 🏇 🧘 🏄 🏊 🤽 🚣 🧗 🚵 🚴 🏆 🥇 🥈 🥉 🏅 🎖️ 🏵️ 🎗️ 🎫 🎟️ 🎪 🤹 🎭 🩰 🎨 🎬 🎤 🎧 🎼 🎹 🥁 🪘 🎷 🎺 🪗 🎸 🪕 🎻 🪈'.split(' '),
+  Objects: '⌚ 📱 💻 ⌨️ 🖥️ 🖨️ 🖱️ 🖲️ 🕹️ 🗜️ 💽 💾 💿 📀 📼 📷 📸 📹 🎥 📽️ 🎞️ 📞 ☎️ 📟 📠 📺 📻 🎙️ 🎚️ 🎛️ 🧭 ⏱️ ⏲️ ⏰ 🕰️ ⌛ ⏳ 📡 🔋 🪫 🔌 💡 🔦 🕯️ 🪔 🧯 🛢️ 💸 💵 💴 💶 💷 🪙 💰 💳 💎 ⚖️ 🪜 🧰 🪛 🔧 🔨 ⚒️ 🛠️ ⛏️ 🪚 🔩 ⚙️ 🧱 ⛓️ 🧲 🔫 💣 🧨 🪓 🔪 🗡️ 🛡️ 🚬 ⚰️ 🪦 ⚱️ 🏺 🔮 📿 🧿 🪬'.split(' '),
+  Symbols: '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 ❤️‍🔥 ❤️‍🩹 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 ☮️ ✝️ ☪️ 🕉️ ☸️ ✡️ 🔯 🕎 ☯️ ☦️ 🛐 ⛎ ♈ ♉ ♊ ♋ ♌ ♍ ♎ ♏ ♐ ♑ ♒ ♓ 🆔 ⚛️ 🉑 ☢️ ☣️ 📴 📳 🈶 🈚 🈸 🈺 🈷️ ✴️ 🆚 💮 🉐 ㊙️ ㊗️ 🈴 🈵 🈹 🈲 🅰️ 🅱️ 🆎 🆑 🅾️ 🆘 ❌ ⭕ 🛑 ⛔ 📛 🚫 💯 💢 ♨️ 🚷 🚯 🚳 🚱 🔞'.split(' '),
+  Flags: '🏁 🚩 🎌 🏴 🏳️ 🏳️‍🌈 🏳️‍⚧️ 🏴‍☠️ 🇦🇪 🇵🇭 🇺🇸 🇬🇧 🇨🇦 🇦🇺 🇳🇿 🇯🇵 🇰🇷 🇨🇳 🇮🇳 🇸🇬 🇲🇾 🇮🇩 🇹🇭 🇻🇳 🇭🇰 🇹🇼 🇸🇦 🇶🇦 🇰🇼 🇴🇲 🇧🇭 🇪🇬 🇿🇦 🇫🇷 🇩🇪 🇮🇹 🇪🇸 🇵🇹 🇳🇱 🇧🇪 🇨🇭 🇦🇹 🇸🇪 🇳🇴 🇩🇰 🇫🇮 🇵🇱 🇨🇿 🇬🇷 🇹🇷 🇧🇷 🇲🇽 🇦🇷 🇨🇱 🇨🇴 🇵🇪'.split(' ')
+};
+const animatedEmojiPresets = [
+  { emoji: '😂', label: 'laugh bounce', animation: 'bounce' },
+  { emoji: '😍', label: 'love pulse', animation: 'pulse' },
+  { emoji: '🔥', label: 'fire flicker', animation: 'flicker' },
+  { emoji: '⭐', label: 'star spin', animation: 'spin' },
+  { emoji: '🎉', label: 'party pop', animation: 'bounce' },
+  { emoji: '🚀', label: 'rocket float', animation: 'float' },
+  { emoji: '💡', label: 'idea pulse', animation: 'pulse' },
+  { emoji: '✅', label: 'check bounce', animation: 'bounce' },
+  { emoji: '⚠️', label: 'warning pulse', animation: 'pulse' },
+  { emoji: '❤️', label: 'heart beat', animation: 'pulse' },
+  { emoji: '👋', label: 'wave spin', animation: 'swing' },
+  { emoji: '👏', label: 'clap bounce', animation: 'bounce' }
+];
 let activeTool = 'pen';
 let activeObject = null;
 let drawing = false;
@@ -39,6 +72,13 @@ let toolbarCollapsed = false;
 let toolbarDrag = null;
 let moveTarget = null;
 let moveLastPoint = null;
+let resizeTarget = null;
+let resizeStart = null;
+let animationFrame = null;
+let activeEmoji = null;
+let activeEmojiAnimated = false;
+let activeEmojiAnimation = 'bounce';
+let emojiCategory = 'Smileys';
 let pendingText = null;
 let youtubeMove = null;
 let youtubeSize = null;
@@ -156,6 +196,94 @@ function positionSupplementPanel() {
   supplementPanel.style.transform = 'none';
 }
 
+function positionEmojiPanel() {
+  const toolbarRect = toolbar.getBoundingClientRect();
+  const panelRect = emojiPanel.getBoundingClientRect();
+  const left = Math.max(8, Math.min(toolbarRect.left, window.innerWidth - panelRect.width - 8));
+  const preferredTop = toolbarRect.top - panelRect.height - 8;
+  const top = preferredTop >= 8 ? preferredTop : Math.min(toolbarRect.bottom + 8, window.innerHeight - panelRect.height - 8);
+  emojiPanel.style.left = `${left}px`;
+  emojiPanel.style.top = `${Math.max(8, top)}px`;
+  emojiPanel.style.bottom = 'auto';
+  emojiPanel.style.transform = 'none';
+}
+
+function toggleEmojiPanel(force) {
+  const visible = force ?? emojiPanel.classList.contains('hidden');
+  emojiPanel.classList.toggle('hidden', !visible);
+  emojiToggle.classList.toggle('active', visible);
+  if (visible) {
+    renderEmojiGrid();
+    requestAnimationFrame(positionEmojiPanel);
+    emojiSearch.focus();
+  }
+  wakeToolbar();
+}
+
+function selectEmoji(emoji, animated = false, animation = 'bounce') {
+  activeEmoji = emoji;
+  activeEmojiAnimated = animated;
+  activeEmojiAnimation = animation;
+  activeTool = 'emoji';
+  moveTarget = null;
+  moveLastPoint = null;
+  resizeTarget = null;
+  resizeStart = null;
+  document.body.classList.remove('move-mode', 'moving-object', 'resizing-object');
+  document.querySelectorAll('.tool, .supplement-tool').forEach((button) => {
+    button.classList.toggle('active', false);
+  });
+  emojiToggle.classList.add('active');
+  canvas.style.cursor = 'copy';
+  wakeToolbar();
+}
+
+function renderEmojiCategories() {
+  emojiCategories.innerHTML = '';
+  Object.keys(emojiGroups).forEach((category) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = category;
+    button.classList.toggle('active', category === emojiCategory);
+    button.addEventListener('click', () => {
+      emojiCategory = category;
+      renderEmojiCategories();
+      renderEmojiGrid();
+    });
+    emojiCategories.appendChild(button);
+  });
+}
+
+function renderAnimatedEmojiRow() {
+  animatedEmojiRow.innerHTML = '';
+  animatedEmojiPresets.forEach((preset) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = preset.emoji;
+    button.title = `Animated ${preset.label}`;
+    button.addEventListener('click', () => selectEmoji(preset.emoji, true, preset.animation));
+    animatedEmojiRow.appendChild(button);
+  });
+}
+
+function renderEmojiGrid() {
+  const query = emojiSearch.value.trim().toLowerCase();
+  const source = query
+    ? Object.entries(emojiGroups).flatMap(([category, emojis]) => emojis.map((emoji) => ({ category, emoji })))
+    : emojiGroups[emojiCategory].map((emoji) => ({ category: emojiCategory, emoji }));
+  emojiGrid.innerHTML = '';
+  source
+    .filter((entry) => !query || entry.category.toLowerCase().includes(query) || entry.emoji.includes(query))
+    .forEach((entry) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = entry.emoji;
+      button.title = `${entry.category} emoji`;
+      button.addEventListener('click', () => selectEmoji(entry.emoji, false, 'bounce'));
+      emojiGrid.appendChild(button);
+    });
+}
+
 function extractYouTubeId(value) {
   const input = value.trim();
   if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
@@ -208,6 +336,8 @@ function clearObjects() {
   activeObject = null;
   moveTarget = null;
   moveLastPoint = null;
+  resizeTarget = null;
+  resizeStart = null;
   closeTextEditor();
   redraw();
   wakeToolbar();
@@ -220,6 +350,8 @@ function deleteSelectedObject() {
   objects.splice(index, 1);
   moveTarget = null;
   moveLastPoint = null;
+  resizeTarget = null;
+  resizeStart = null;
   drawing = false;
   redraw();
   wakeToolbar();
@@ -258,6 +390,7 @@ function resizeCanvas() {
     applyToolbarPosition(rect.left, rect.top, true);
   }
   if (!supplementPanel.classList.contains('hidden')) positionSupplementPanel();
+  if (!emojiPanel.classList.contains('hidden')) positionEmojiPanel();
   if (!youtubePlayer.classList.contains('hidden') && !youtubePlayer.classList.contains('fullscreen')) {
     const rect = youtubePlayer.getBoundingClientRect();
     applyYouTubeBounds(rect.left, rect.top, rect.width, rect.height);
@@ -317,6 +450,15 @@ function objectBounds(item) {
       height
     };
   }
+  if (item.type === 'emoji') {
+    const size = item.fontSize || Math.max(34, item.width * 8);
+    return {
+      x: item.start.x,
+      y: item.start.y - size,
+      width: size,
+      height: size
+    };
+  }
   return { x: 0, y: 0, width: 0, height: 0 };
 }
 
@@ -347,6 +489,58 @@ function moveObject(item, dx, dy) {
     movePoint(item.end, dx, dy);
   } else if (item.start) {
     movePoint(item.start, dx, dy);
+  }
+}
+
+function cloneObject(item) {
+  return JSON.parse(JSON.stringify(item));
+}
+
+function restoreObject(target, source) {
+  Object.keys(target).forEach((key) => delete target[key]);
+  Object.assign(target, cloneObject(source));
+}
+
+function resizeHandleBounds(bounds) {
+  return {
+    x: bounds.x + bounds.width + 4,
+    y: bounds.y + bounds.height + 4,
+    width: 16,
+    height: 16
+  };
+}
+
+function pointInResizeHandle(point, item) {
+  if (!item) return false;
+  return pointInBounds(point, resizeHandleBounds(objectBounds(item)), 0);
+}
+
+function transformPointFromBounds(point, from, to) {
+  const sourceWidth = Math.max(1, from.width);
+  const sourceHeight = Math.max(1, from.height);
+  return {
+    x: to.x + ((point.x - from.x) / sourceWidth) * to.width,
+    y: to.y + ((point.y - from.y) / sourceHeight) * to.height
+  };
+}
+
+function resizeObject(item, fromBounds, toBounds) {
+  if (item.type === 'pen') {
+    item.points = item.points.map((point) => transformPointFromBounds(point, fromBounds, toBounds));
+  } else if (item.start && item.end) {
+    item.start = transformPointFromBounds(item.start, fromBounds, toBounds);
+    item.end = transformPointFromBounds(item.end, fromBounds, toBounds);
+  } else if (item.start) {
+    item.start = { x: toBounds.x, y: toBounds.y + toBounds.height };
+  }
+
+  if (item.type === 'text' || item.type === 'formula') {
+    const ratio = Math.max(toBounds.width / Math.max(1, fromBounds.width), toBounds.height / Math.max(1, fromBounds.height));
+    item.width = Math.max(2, Math.min(40, item.width * ratio));
+  } else if (item.type === 'emoji') {
+    const ratio = Math.max(toBounds.width / Math.max(1, fromBounds.width), toBounds.height / Math.max(1, fromBounds.height));
+    item.fontSize = Math.max(18, Math.min(260, item.fontSize * ratio));
+    item.start = { x: toBounds.x, y: toBounds.y + item.fontSize };
   }
 }
 
@@ -441,6 +635,29 @@ function drawObject(item) {
     ctx.strokeText(item.text, item.start.x, item.start.y);
     ctx.fillStyle = item.color;
     ctx.fillText(item.text, item.start.x, item.start.y);
+  } else if (item.type === 'emoji') {
+    const time = performance.now() / 1000;
+    const size = item.fontSize || Math.max(34, item.width * 8);
+    const cx = item.start.x + size / 2;
+    const cy = item.start.y - size / 2;
+    let scale = 1;
+    let rotate = 0;
+    let dy = 0;
+    if (item.animated) {
+      if (item.animation === 'pulse') scale = 1 + Math.sin(time * 5) * 0.12;
+      else if (item.animation === 'bounce') dy = Math.sin(time * 6) * 7;
+      else if (item.animation === 'spin') rotate = time * 1.8;
+      else if (item.animation === 'float') dy = Math.sin(time * 2.2) * 10;
+      else if (item.animation === 'flicker') scale = 0.96 + Math.random() * 0.12;
+      else if (item.animation === 'swing') rotate = Math.sin(time * 5) * 0.32;
+    }
+    ctx.translate(cx, cy + dy);
+    ctx.rotate(rotate);
+    ctx.scale(scale, scale);
+    ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(item.emoji, 0, 0);
   }
   ctx.restore();
 }
@@ -456,8 +673,27 @@ function redraw() {
     ctx.strokeStyle = 'rgba(98, 221, 234, 0.9)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(bounds.x - 6, bounds.y - 6, bounds.width + 12, bounds.height + 12);
+    const handle = resizeHandleBounds(bounds);
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(98, 221, 234, 0.96)';
+    ctx.strokeStyle = 'rgba(5, 15, 22, 0.92)';
+    ctx.fillRect(handle.x, handle.y, handle.width, handle.height);
+    ctx.strokeRect(handle.x, handle.y, handle.width, handle.height);
     ctx.restore();
   }
+}
+
+function ensureAnimationLoop() {
+  if (animationFrame) return;
+  const tick = () => {
+    if (objects.some((item) => item.type === 'emoji' && item.animated)) {
+      redraw();
+      animationFrame = requestAnimationFrame(tick);
+    } else {
+      animationFrame = null;
+    }
+  };
+  animationFrame = requestAnimationFrame(tick);
 }
 
 function currentStyle() {
@@ -473,9 +709,25 @@ function beginObject(event) {
   const style = currentStyle();
 
   if (activeTool === 'move') {
+    if (moveTarget && pointInResizeHandle(start, moveTarget)) {
+      const bounds = objectBounds(moveTarget);
+      resizeTarget = moveTarget;
+      resizeStart = {
+        bounds,
+        source: cloneObject(moveTarget),
+        minX: bounds.x,
+        minY: bounds.y,
+        pointerId: event.pointerId
+      };
+      drawing = true;
+      document.body.classList.add('resizing-object');
+      redraw();
+      return;
+    }
     moveTarget = hitTestObject(start);
     moveLastPoint = moveTarget ? start : null;
     drawing = Boolean(moveTarget);
+    document.body.classList.toggle('moving-object', drawing);
     redraw();
     return;
   }
@@ -484,6 +736,22 @@ function beginObject(event) {
 
   if (activeTool === 'text' || activeTool === 'formula') {
     positionTextEditor(start, activeTool);
+    drawing = false;
+    return;
+  }
+
+  if (activeTool === 'emoji' && activeEmoji) {
+    objects.push({
+      type: 'emoji',
+      start,
+      emoji: activeEmoji,
+      animated: activeEmojiAnimated,
+      animation: activeEmojiAnimation,
+      fontSize: Math.max(34, Number(strokeSizeInput.value || 6) * 8),
+      ...style
+    });
+    redraw();
+    if (activeEmojiAnimated) ensureAnimationLoop();
     drawing = false;
     return;
   }
@@ -497,6 +765,18 @@ function beginObject(event) {
 function updateObject(event) {
   if (!inputEnabled || !drawing) return;
   const point = pointFromEvent(event);
+  if (resizeTarget && resizeStart) {
+    const nextBounds = {
+      x: resizeStart.minX,
+      y: resizeStart.minY,
+      width: Math.max(18, point.x - resizeStart.minX),
+      height: Math.max(18, point.y - resizeStart.minY)
+    };
+    restoreObject(resizeTarget, resizeStart.source);
+    resizeObject(resizeTarget, resizeStart.bounds, nextBounds);
+    redraw();
+    return;
+  }
   if (activeTool === 'move' && moveTarget && moveLastPoint) {
     moveObject(moveTarget, point.x - moveLastPoint.x, point.y - moveLastPoint.y);
     moveLastPoint = point;
@@ -513,6 +793,9 @@ function commitObject() {
   if (activeTool === 'move') {
     drawing = false;
     moveLastPoint = null;
+    resizeTarget = null;
+    resizeStart = null;
+    document.body.classList.remove('moving-object', 'resizing-object');
     redraw();
     scheduleAutoHide();
     return;
@@ -528,9 +811,16 @@ function commitObject() {
 function selectTool(tool) {
   activeTool = tool;
   document.body.classList.toggle('move-mode', tool === 'move');
+  document.body.classList.remove('moving-object', 'resizing-object');
+  canvas.style.cursor = '';
+  activeEmoji = null;
+  activeEmojiAnimated = false;
+  emojiToggle.classList.remove('active');
   if (tool !== 'move') {
     moveTarget = null;
     moveLastPoint = null;
+    resizeTarget = null;
+    resizeStart = null;
     redraw();
   }
   document.querySelectorAll('.tool, .supplement-tool').forEach((button) => {
@@ -546,6 +836,10 @@ toolbar.addEventListener('click', (event) => {
 });
 
 supplementToggle.addEventListener('click', () => toggleSupplementPanel());
+
+emojiToggle.addEventListener('click', () => toggleEmojiPanel());
+emojiPanelClose.addEventListener('click', () => toggleEmojiPanel(false));
+emojiSearch.addEventListener('input', renderEmojiGrid);
 
 supplementPanel.addEventListener('click', (event) => {
   wakeToolbar();
@@ -708,6 +1002,10 @@ closeButton.addEventListener('click', () => {
   setInputMode(false);
 });
 
+toolbarCloseButton.addEventListener('click', () => {
+  setInputMode(false);
+});
+
 window.addEventListener('keydown', (event) => {
   if (!textEditor.classList.contains('hidden') && event.key === 'Escape') {
     closeTextEditor();
@@ -740,12 +1038,15 @@ if (standaloneMode) {
   document.querySelector('.annotation-brand')?.classList.add('toolbar-drag-handle');
 }
 restoreToolbarPosition();
+renderEmojiCategories();
+renderAnimatedEmojiRow();
+renderEmojiGrid();
 applyInputMode(true);
 scheduleAutoHide();
 window.screenStudioAnnotation.ready({
   ready: true,
   tools: Array.from(document.querySelectorAll('.tool, .supplement-tool')).map((button) => button.dataset.tool),
-  supplementary: ['blur', 'formula', 'youtube'],
+  supplementary: ['blur', 'formula', 'youtube', 'emoji', 'animated-emoji'],
   inputModes: ['annotate', 'navigate'],
   autoHide: false,
   undo: Boolean(undoButton),

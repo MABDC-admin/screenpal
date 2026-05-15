@@ -28,6 +28,7 @@
       <button class="tool" type="button" data-tool="spotlight" title="Pointer spotlight">Pointer</button>
       <button class="tool" type="button" data-tool="text" title="Text label">Text</button>
       <button class="tool" type="button" data-tool="move" title="Move existing objects">Move</button>
+      <button id="emojiToggle" type="button" title="Open emoji tools">Emoji</button>
       <button id="supplementToggle" type="button" title="Show supplementary tools">More</button>
       <label class="color-field" title="Annotation color">
         <span>Color</span>
@@ -42,6 +43,17 @@
       <button id="clear" type="button" title="Clear all objects">Clear</button>
       <button id="stop" class="danger" type="button" title="Stop recording">Stop Rec</button>
       <button id="close" type="button" title="Hide annotation tools but keep the reopen button available">Hide Tools</button>
+      <button id="toolbarClose" class="toolbar-close" type="button" title="Close annotation tools">X</button>
+    </div>
+    <div id="emojiPanel" class="emoji-panel hidden" aria-label="Emoji tools">
+      <div class="emoji-panel-header">
+        <strong>Emoji</strong>
+        <input id="emojiSearch" type="search" placeholder="Search emoji" />
+        <button id="emojiPanelClose" type="button">X</button>
+      </div>
+      <div id="emojiCategories" class="emoji-categories"></div>
+      <div id="animatedEmojiRow" class="animated-emoji-row" aria-label="Animated emojis"></div>
+      <div id="emojiGrid" class="emoji-grid"></div>
     </div>
     <div id="supplementPanel" class="supplement-panel hidden" aria-label="Supplementary annotation tools">
       <button class="supplement-tool" type="button" data-tool="blur" title="Cover sensitive information">Blur Info</button>
