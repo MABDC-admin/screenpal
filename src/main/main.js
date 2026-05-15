@@ -23,6 +23,7 @@ let mainWindow;
 let guideWindow;
 let countdownWindow;
 let annotationWindow;
+let annotationControlWindow;
 let annotationReadyMetrics = null;
 let annotationInputEnabled = true;
 let guideResolver;
@@ -286,14 +287,80 @@ async function closeCountdownWindow() {
 
 async function closeAnnotationWindow() {
   const target = annotationWindow;
+  const controlTarget = annotationControlWindow;
   annotationWindow = null;
+  annotationControlWindow = null;
   annotationInputEnabled = true;
+  if (controlTarget && !controlTarget.isDestroyed()) {
+    controlTarget.close();
+  }
   if (!target || target.isDestroyed()) return false;
   await new Promise((resolve) => {
     target.once('closed', resolve);
     target.close();
   });
   return true;
+}
+
+function closeAnnotationControlWindow() {
+  const target = annotationControlWindow;
+  annotationControlWindow = null;
+  if (target && !target.isDestroyed()) target.close();
+}
+
+function showAnnotationControlWindow() {
+  if (process.env.SCREEN_STUDIO_SELF_TEST) return;
+  if (!annotationWindow || annotationWindow.isDestroyed()) return;
+  if (annotationControlWindow && !annotationControlWindow.isDestroyed()) {
+    annotationControlWindow.showInactive();
+    return;
+  }
+  const display = screen.getPrimaryDisplay();
+  const area = display.workArea;
+  annotationControlWindow = new BrowserWindow({
+    x: area.x + area.width - 110,
+    y: area.y + 188,
+    width: 88,
+    height: 56,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    fullscreenable: false,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'annotation-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
+    }
+  });
+  annotationControlWindow.setAlwaysOnTop(true, 'screen-saver');
+  annotationControlWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; font-family: Segoe UI, Arial, sans-serif; }
+      button { width: 76px; height: 44px; margin: 6px; border: 1px solid rgba(98, 221, 234, 0.86); border-radius: 999px; background: rgba(35, 138, 154, 0.96); color: white; font-size: 12px; font-weight: 900; box-shadow: 0 14px 40px rgba(0,0,0,.28); }
+      button:hover { background: rgba(45, 164, 181, 0.98); }
+    </style>
+  </head>
+  <body>
+    <button id="tools" type="button" title="Turn annotation tools on">Tools</button>
+    <script>
+      document.getElementById('tools').addEventListener('click', () => {
+        window.screenStudioAnnotation.setInputMode(true);
+      });
+    </script>
+  </body>
+</html>`)}`);
+  annotationControlWindow.on('closed', () => {
+    annotationControlWindow = null;
+  });
 }
 
 function setAnnotationInputMode(enabled) {
@@ -303,8 +370,11 @@ function setAnnotationInputMode(enabled) {
   annotationWindow.setIgnoreMouseEvents(!annotationInputEnabled, { forward: true });
   annotationWindow.webContents.send('annotation:input-mode', annotationInputEnabled);
   if (annotationInputEnabled) {
+    closeAnnotationControlWindow();
     annotationWindow.showInactive();
     annotationWindow.setAlwaysOnTop(true, 'screen-saver');
+  } else {
+    showAnnotationControlWindow();
   }
   return { enabled: annotationInputEnabled };
 }
@@ -1985,6 +2055,7 @@ app.on('before-quit', () => {
   isQuitting = true;
   closeCountdownWindow().catch(() => {});
   closeAnnotationWindow().catch(() => {});
+  closeAnnotationControlWindow();
   if (activeNativeCapture) {
     try {
       activeNativeCapture.process.stdin.write('q');

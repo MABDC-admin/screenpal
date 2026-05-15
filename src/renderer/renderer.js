@@ -1035,6 +1035,7 @@ function syncMiniAnnotationButton() {
 async function setAnnotationInput(enabled) {
   annotationInputEnabled = Boolean(enabled);
   syncMiniAnnotationButton();
+  if (selfTestMode) return { enabled: annotationInputEnabled, selfTest: true };
   return await window.screenStudio.setAnnotationInputMode(annotationInputEnabled);
 }
 
@@ -2417,6 +2418,20 @@ async function runSelfTest() {
       if (!lastMiniRecorderCheck.bodyMiniMode || !lastMiniRecorderCheck.visible || !lastMiniRecorderCheck.stopVisible || !lastMiniRecorderCheck.annotationToggleVisible) {
         throw new Error(`Mini recorder did not appear during capture: ${JSON.stringify(lastMiniRecorderCheck)}`);
       }
+      await setAnnotationInput(false);
+      const toolsOffCheck = miniRecorderMetrics();
+      if (toolsOffCheck.annotationToggleText !== 'Tools Off') {
+        throw new Error(`Annotation tools could not turn off: ${JSON.stringify(toolsOffCheck)}`);
+      }
+      await setAnnotationInput(true);
+      const toolsOnCheck = miniRecorderMetrics();
+      if (toolsOnCheck.annotationToggleText !== 'Tools On') {
+        throw new Error(`Annotation tools could not turn back on: ${JSON.stringify(toolsOnCheck)}`);
+      }
+      lastMiniRecorderCheck.annotationToggleCycle = {
+        off: toolsOffCheck.annotationToggleText,
+        on: toolsOnCheck.annotationToggleText
+      };
       await new Promise((resolve) => setTimeout(resolve, 2200));
       await stopRecording();
     }
