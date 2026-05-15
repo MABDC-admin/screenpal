@@ -1569,7 +1569,7 @@ body.split-resizing .project-list {
   width: 100vw;
   height: 100vh;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 14px;
   padding: 14px;
@@ -1616,6 +1616,17 @@ body.split-resizing .project-list {
   color: #b8c4d0;
   font-size: 12px;
   font-weight: 800;
+}
+
+#miniAnnotationToggle {
+  min-width: 96px;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+#miniAnnotationToggle.active-tool {
+  background: #238a9a;
+  border-color: #62ddea;
 }
 
 @media (max-width: 1180px) {

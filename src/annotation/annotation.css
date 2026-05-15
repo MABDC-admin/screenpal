@@ -17,6 +17,31 @@ body {
   cursor: crosshair;
 }
 
+.collapsed-tool {
+  position: fixed;
+  right: 24px;
+  top: 24px;
+  z-index: 11;
+  display: grid;
+  place-items: center;
+  width: 64px;
+  min-width: 64px;
+  height: 46px;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(35, 138, 154, 0.94);
+  border-color: rgba(98, 221, 234, 0.82);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px) scale(0.92);
+  transition: opacity 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.collapsed-tool:hover {
+  background: rgba(45, 164, 181, 0.98);
+}
+
 .toolbar {
   position: fixed;
   left: 50%;
@@ -33,6 +58,41 @@ body {
   background: rgba(12, 18, 28, 0.88);
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(14px);
+  opacity: 1;
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+body.toolbar-collapsed .toolbar {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(18px) scale(0.96);
+}
+
+body.toolbar-collapsed .collapsed-tool {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+body.navigation-mode #drawCanvas {
+  cursor: default;
+}
+
+body.navigation-mode .tool,
+body.navigation-mode .color-field,
+body.navigation-mode .size-field,
+body.navigation-mode #undo,
+body.navigation-mode #clear {
+  opacity: 0.5;
+}
+
+body.navigation-mode .mode-toggle {
+  background: #46515f;
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+body.navigation-mode .toolbar {
+  opacity: 0.18;
 }
 
 button,
@@ -55,6 +115,10 @@ button {
 button.active {
   background: #238a9a;
   border-color: #4ec8d5;
+}
+
+button.mode-toggle {
+  min-width: 104px;
 }
 
 button.danger {

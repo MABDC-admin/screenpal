@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('screenStudio', {
   showAfterCapture: () => ipcRenderer.invoke('window:show-after-capture'),
   showAnnotations: () => ipcRenderer.invoke('annotation:show'),
   closeAnnotations: () => ipcRenderer.invoke('annotation:close'),
+  setAnnotationInputMode: (enabled) => ipcRenderer.invoke('annotation:set-input-mode', enabled),
   hideForScreenshot: () => ipcRenderer.invoke('window:hide-for-screenshot'),
   showAfterScreenshot: () => ipcRenderer.invoke('window:show-after-screenshot'),
   selectRegion: () => ipcRenderer.invoke('capture:select-region'),

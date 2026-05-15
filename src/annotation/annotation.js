@@ -1,5 +1,7 @@
 const canvas = document.getElementById('drawCanvas');
 const toolbar = document.getElementById('toolbar');
+const collapsedTool = document.getElementById('collapsedTool');
+const inputModeButton = document.getElementById('inputMode');
 const colorInput = document.getElementById('color');
 const strokeSizeInput = document.getElementById('strokeSize');
 const undoButton = document.getElementById('undo');
@@ -13,6 +15,40 @@ let activeTool = 'pen';
 let activeObject = null;
 let drawing = false;
 let dpr = 1;
+let inputEnabled = true;
+let toolbarCollapsed = false;
+let autoHideTimer = null;
+
+function setToolbarCollapsed(collapsed) {
+  toolbarCollapsed = Boolean(collapsed);
+  document.body.classList.toggle('toolbar-collapsed', toolbarCollapsed);
+}
+
+function scheduleAutoHide() {
+  clearTimeout(autoHideTimer);
+  if (!inputEnabled || drawing) return;
+  autoHideTimer = setTimeout(() => setToolbarCollapsed(true), 4500);
+}
+
+function wakeToolbar() {
+  setToolbarCollapsed(false);
+  scheduleAutoHide();
+}
+
+function applyInputMode(enabled) {
+  inputEnabled = Boolean(enabled);
+  document.body.classList.toggle('navigation-mode', !inputEnabled);
+  inputModeButton.classList.toggle('active', inputEnabled);
+  inputModeButton.textContent = inputEnabled ? 'Annotate On' : 'Navigate Off';
+  canvas.style.pointerEvents = inputEnabled ? 'auto' : 'none';
+  if (inputEnabled) wakeToolbar();
+  else setToolbarCollapsed(true);
+}
+
+async function setInputMode(enabled) {
+  applyInputMode(enabled);
+  await window.screenStudioAnnotation.setInputMode(inputEnabled);
+}
 
 function resizeCanvas() {
   dpr = window.devicePixelRatio || 1;
@@ -109,7 +145,7 @@ function currentStyle() {
 }
 
 function beginObject(event) {
-  if (event.target !== canvas) return;
+  if (!inputEnabled || event.target !== canvas) return;
   const start = pointFromEvent(event);
   const style = currentStyle();
   drawing = true;
@@ -131,7 +167,7 @@ function beginObject(event) {
 }
 
 function updateObject(event) {
-  if (!drawing || !activeObject) return;
+  if (!inputEnabled || !drawing || !activeObject) return;
   const point = pointFromEvent(event);
   if (activeObject.type === 'pen') activeObject.points.push(point);
   else activeObject.end = point;
@@ -144,6 +180,7 @@ function commitObject() {
   activeObject = null;
   drawing = false;
   redraw();
+  scheduleAutoHide();
 }
 
 function selectTool(tool) {
@@ -154,8 +191,22 @@ function selectTool(tool) {
 }
 
 toolbar.addEventListener('click', (event) => {
+  wakeToolbar();
   const button = event.target.closest('.tool');
   if (button) selectTool(button.dataset.tool);
+});
+
+toolbar.addEventListener('pointerenter', wakeToolbar);
+toolbar.addEventListener('pointermove', wakeToolbar);
+canvas.addEventListener('pointermove', () => {
+  if (toolbarCollapsed || drawing) return;
+  scheduleAutoHide();
+});
+
+collapsedTool.addEventListener('click', wakeToolbar);
+
+inputModeButton.addEventListener('click', () => {
+  setInputMode(!inputEnabled);
 });
 
 canvas.addEventListener('pointerdown', beginObject);
@@ -166,12 +217,14 @@ canvas.addEventListener('pointerleave', commitObject);
 undoButton.addEventListener('click', () => {
   objects.pop();
   redraw();
+  wakeToolbar();
 });
 
 clearButton.addEventListener('click', () => {
   objects.length = 0;
   activeObject = null;
   redraw();
+  wakeToolbar();
 });
 
 stopButton.addEventListener('click', () => {
@@ -187,19 +240,30 @@ window.addEventListener('keydown', (event) => {
     event.preventDefault();
     objects.pop();
     redraw();
+    wakeToolbar();
   } else if (event.key === 'Delete') {
     objects.length = 0;
     redraw();
+    wakeToolbar();
   } else if (event.key === 'Escape') {
     window.screenStudioAnnotation.close();
+  } else if (event.key.toLowerCase() === 'a') {
+    setInputMode(!inputEnabled);
   }
 });
 
 window.addEventListener('resize', resizeCanvas);
+window.screenStudioAnnotation.onInputModeChange((enabled) => {
+  applyInputMode(enabled);
+});
 resizeCanvas();
+applyInputMode(true);
+scheduleAutoHide();
 window.screenStudioAnnotation.ready({
   ready: true,
   tools: Array.from(document.querySelectorAll('.tool')).map((button) => button.dataset.tool),
+  inputModes: ['annotate', 'navigate'],
+  autoHide: Boolean(collapsedTool),
   undo: Boolean(undoButton),
   clear: Boolean(clearButton)
 });

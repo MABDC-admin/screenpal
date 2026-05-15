@@ -62,6 +62,7 @@ const previewDuration = document.getElementById('previewDuration');
 const miniRecorder = document.getElementById('miniRecorder');
 const miniRecorderTitle = document.getElementById('miniRecorderTitle');
 const miniRecorderMeta = document.getElementById('miniRecorderMeta');
+const miniAnnotationToggle = document.getElementById('miniAnnotationToggle');
 const miniStopCapture = document.getElementById('miniStopCapture');
 const jobPanel = document.getElementById('jobPanel');
 const jobText = document.getElementById('jobText');
@@ -119,6 +120,7 @@ let nativeAudioFlags = null;
 let jobHideTimer = null;
 let lastCountdownCheck = null;
 let lastAnnotationCheck = null;
+let annotationInputEnabled = true;
 const selfTestMode = new URLSearchParams(window.location.search).get('selftest') === '1';
 const projectBrowserHeightKey = 'screenStudio.projectBrowserHeight';
 const previewHeightKey = 'screenStudio.previewHeight';
@@ -934,15 +936,18 @@ function previewTimelineMetrics() {
 
 function verifyAnnotationTools(metrics) {
   const tools = metrics?.tools || [];
+  const inputModes = metrics?.inputModes || [];
   const required = ['pen', 'arrow', 'rect', 'ellipse', 'spotlight', 'text'];
   const result = {
     ready: Boolean(metrics?.ready),
     tools,
+    inputModes,
+    autoHide: Boolean(metrics?.autoHide),
     undo: Boolean(metrics?.undo),
     clear: Boolean(metrics?.clear),
     skippedForSelfTest: Boolean(metrics?.skippedForSelfTest)
   };
-  if (!result.ready || !result.undo || !result.clear || required.some((tool) => !tools.includes(tool))) {
+  if (!result.ready || !result.undo || !result.clear || !result.autoHide || !inputModes.includes('annotate') || !inputModes.includes('navigate') || required.some((tool) => !tools.includes(tool))) {
     throw new Error(`Annotation tools are not ready: ${JSON.stringify(result)}`);
   }
   return result;
@@ -951,10 +956,13 @@ function verifyAnnotationTools(metrics) {
 function miniRecorderMetrics() {
   const rect = miniRecorder.getBoundingClientRect();
   const stopRect = miniStopCapture.getBoundingClientRect();
+  const annotationRect = miniAnnotationToggle.getBoundingClientRect();
   return {
     bodyMiniMode: document.body.classList.contains('mini-mode'),
     visible: !miniRecorder.hidden && rect.width > 120 && rect.height > 60,
     stopVisible: !miniStopCapture.disabled && stopRect.width > 40 && stopRect.height > 30,
+    annotationToggleVisible: !miniAnnotationToggle.disabled && !miniAnnotationToggle.hidden && annotationRect.width > 70 && annotationRect.height > 30,
+    annotationToggleText: miniAnnotationToggle.textContent,
     title: miniRecorderTitle.textContent,
     timer: miniRecorderMeta.textContent
   };
@@ -1011,7 +1019,23 @@ function setMiniRecorderMode(enabled, title = 'Recording') {
   miniRecorder.hidden = !enabled;
   miniRecorderTitle.textContent = title;
   miniStopCapture.disabled = !enabled;
+  miniAnnotationToggle.disabled = !enabled;
+  miniAnnotationToggle.hidden = !enabled;
   miniRecorderMeta.textContent = recordTimer.textContent;
+}
+
+function syncMiniAnnotationButton() {
+  miniAnnotationToggle.textContent = annotationInputEnabled ? 'Tools On' : 'Tools Off';
+  miniAnnotationToggle.classList.toggle('active-tool', annotationInputEnabled);
+  miniAnnotationToggle.title = annotationInputEnabled
+    ? 'Annotation tools are active. Use Navigate Off in the toolbar to scroll or click through.'
+    : 'Annotation tools are in pass-through mode. Click to draw again.';
+}
+
+async function setAnnotationInput(enabled) {
+  annotationInputEnabled = Boolean(enabled);
+  syncMiniAnnotationButton();
+  return await window.screenStudio.setAnnotationInputMode(annotationInputEnabled);
 }
 
 function playbackControlsVisible() {
@@ -1598,6 +1622,7 @@ async function beginNativeRecording() {
     ready: false,
     error: error.message || String(error)
   }));
+  await setAnnotationInput(true).catch(() => {});
   if (companionAudio?.hasSystemAudio) {
     setStatus(`Recording smooth desktop video · annotation tools ready · system sound ${companionAudio.hasMicAudio ? '+ microphone ' : ''}will be muxed into MP4`);
   } else {
@@ -1671,6 +1696,8 @@ async function stopRecording() {
     setStatus('Stopping FFmpeg recording...');
     try {
       await window.screenStudio.closeAnnotations().catch(() => {});
+      annotationInputEnabled = true;
+      syncMiniAnnotationButton();
       const companionAudio = await stopNativeCompanionAudio();
       const project = await window.screenStudio.stopNativeCapture(session.id, companionAudio);
       setRecordingState('idle');
@@ -2263,6 +2290,11 @@ previewTimeline.addEventListener('change', () => {
   updatePreviewTimeline();
 });
 miniStopCapture.addEventListener('click', stopRecording);
+miniAnnotationToggle.addEventListener('click', () => {
+  setAnnotationInput(!annotationInputEnabled).catch((error) => {
+    setStatus(error.message || 'Unable to toggle annotation tools');
+  });
+});
 toggleTheme.addEventListener('click', toggleAppTheme);
 toggleMinimalMode.addEventListener('click', () => setMinimalUi(!document.body.classList.contains('minimal-ui')));
 document.addEventListener('click', (event) => {
@@ -2382,7 +2414,7 @@ async function runSelfTest() {
     if (nativeCaptureSession || recorderState === 'recording') {
       await new Promise((resolve) => setTimeout(resolve, 300));
       lastMiniRecorderCheck = miniRecorderMetrics();
-      if (!lastMiniRecorderCheck.bodyMiniMode || !lastMiniRecorderCheck.visible || !lastMiniRecorderCheck.stopVisible) {
+      if (!lastMiniRecorderCheck.bodyMiniMode || !lastMiniRecorderCheck.visible || !lastMiniRecorderCheck.stopVisible || !lastMiniRecorderCheck.annotationToggleVisible) {
         throw new Error(`Mini recorder did not appear during capture: ${JSON.stringify(lastMiniRecorderCheck)}`);
       }
       await new Promise((resolve) => setTimeout(resolve, 2200));

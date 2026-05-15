@@ -11,7 +11,9 @@
   </head>
   <body>
     <canvas id="drawCanvas" aria-label="Recording annotation canvas"></canvas>
+    <button id="collapsedTool" class="collapsed-tool" type="button" title="Show annotation tools">Tools</button>
     <div id="toolbar" class="toolbar" role="toolbar" aria-label="Recording annotation tools">
+      <button id="inputMode" class="mode-toggle active" type="button" title="Toggle drawing tools on or off">Annotate On</button>
       <button class="tool active" type="button" data-tool="pen" title="Pen">Pen</button>
       <button class="tool" type="button" data-tool="arrow" title="Arrow">Arrow</button>
       <button class="tool" type="button" data-tool="rect" title="Rectangle">Rect</button>

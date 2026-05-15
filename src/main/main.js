@@ -24,6 +24,7 @@ let guideWindow;
 let countdownWindow;
 let annotationWindow;
 let annotationReadyMetrics = null;
+let annotationInputEnabled = true;
 let guideResolver;
 let tray;
 let isQuitting = false;
@@ -139,7 +140,7 @@ function enterMiniRecorder() {
   if (!miniRecorderMode) normalWindowBounds = mainWindow.getBounds();
   const display = screen.getDisplayMatching(mainWindow.getBounds());
   const area = display.workArea;
-  const width = 440;
+  const width = 540;
   const height = 150;
   mainWindow.setAlwaysOnTop(true, 'floating');
   mainWindow.setResizable(false);
@@ -286,6 +287,7 @@ async function closeCountdownWindow() {
 async function closeAnnotationWindow() {
   const target = annotationWindow;
   annotationWindow = null;
+  annotationInputEnabled = true;
   if (!target || target.isDestroyed()) return false;
   await new Promise((resolve) => {
     target.once('closed', resolve);
@@ -294,12 +296,27 @@ async function closeAnnotationWindow() {
   return true;
 }
 
+function setAnnotationInputMode(enabled) {
+  annotationInputEnabled = Boolean(enabled);
+  if (process.env.SCREEN_STUDIO_SELF_TEST) return { enabled: annotationInputEnabled };
+  if (!annotationWindow || annotationWindow.isDestroyed()) return { enabled: annotationInputEnabled, missing: true };
+  annotationWindow.setIgnoreMouseEvents(!annotationInputEnabled, { forward: true });
+  annotationWindow.webContents.send('annotation:input-mode', annotationInputEnabled);
+  if (annotationInputEnabled) {
+    annotationWindow.showInactive();
+    annotationWindow.setAlwaysOnTop(true, 'screen-saver');
+  }
+  return { enabled: annotationInputEnabled };
+}
+
 async function showAnnotationWindow() {
   if (process.env.SCREEN_STUDIO_SELF_TEST) {
     annotationReadyMetrics = {
       ready: true,
       skippedForSelfTest: true,
       tools: ['pen', 'arrow', 'rect', 'ellipse', 'spotlight', 'text'],
+      inputModes: ['annotate', 'navigate'],
+      autoHide: true,
       undo: true,
       clear: true
     };
@@ -307,10 +324,12 @@ async function showAnnotationWindow() {
   }
   if (annotationWindow && !annotationWindow.isDestroyed()) {
     annotationWindow.show();
+    setAnnotationInputMode(true);
     return annotationReadyMetrics || { ready: true, reused: true };
   }
   const display = screen.getPrimaryDisplay();
   annotationReadyMetrics = null;
+  annotationInputEnabled = true;
   annotationWindow = new BrowserWindow({
     x: display.bounds.x,
     y: display.bounds.y,
@@ -333,6 +352,7 @@ async function showAnnotationWindow() {
     }
   });
   annotationWindow.setAlwaysOnTop(true, 'screen-saver');
+  annotationWindow.setIgnoreMouseEvents(false);
   annotationWindow.loadFile(path.join(__dirname, '..', 'annotation', 'index.html'));
   annotationWindow.on('closed', () => {
     annotationWindow = null;
@@ -344,6 +364,7 @@ async function showAnnotationWindow() {
       resolve();
     });
   });
+  setAnnotationInputMode(true);
   return annotationReadyMetrics || { ready: true, tools: [], undo: false, clear: false };
 }
 
@@ -1732,6 +1753,10 @@ ipcMain.handle('annotation:show', async () => {
 
 ipcMain.handle('annotation:close', async () => {
   return await closeAnnotationWindow();
+});
+
+ipcMain.handle('annotation:set-input-mode', async (_event, enabled) => {
+  return setAnnotationInputMode(enabled);
 });
 
 ipcMain.handle('annotation:ready', async (_event, metrics) => {
