@@ -178,6 +178,10 @@ body.standalone-mode .collapsed-logo {
   display: block;
 }
 
+body.standalone-mode.navigation-mode .collapsed-tool {
+  display: none;
+}
+
 .color-field,
 .size-field {
   display: inline-flex;
