@@ -12,6 +12,7 @@ const standaloneMode = new URLSearchParams(window.location.search).get('standalo
 
 const ctx = canvas.getContext('2d');
 const objects = [];
+const toolbarPositionKey = 'screenStudioAnnotationToolbarPosition';
 let activeTool = 'pen';
 let activeObject = null;
 let drawing = false;
@@ -19,6 +20,7 @@ let dpr = 1;
 let inputEnabled = true;
 let toolbarCollapsed = false;
 let autoHideTimer = null;
+let toolbarDrag = null;
 
 function setToolbarCollapsed(collapsed) {
   toolbarCollapsed = Boolean(collapsed);
@@ -34,6 +36,40 @@ function scheduleAutoHide() {
 function wakeToolbar() {
   setToolbarCollapsed(false);
   scheduleAutoHide();
+}
+
+function clampToolbarPosition(left, top) {
+  const rect = toolbar.getBoundingClientRect();
+  const margin = 8;
+  return {
+    left: Math.max(margin, Math.min(left, window.innerWidth - rect.width - margin)),
+    top: Math.max(margin, Math.min(top, window.innerHeight - rect.height - margin))
+  };
+}
+
+function applyToolbarPosition(left, top, save = true) {
+  const position = clampToolbarPosition(left, top);
+  toolbar.classList.add('toolbar-dragged');
+  toolbar.style.left = `${position.left}px`;
+  toolbar.style.top = `${position.top}px`;
+  toolbar.style.bottom = 'auto';
+  toolbar.style.transform = 'none';
+  if (save) localStorage.setItem(toolbarPositionKey, JSON.stringify(position));
+}
+
+function restoreToolbarPosition() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(toolbarPositionKey) || 'null');
+    if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) {
+      requestAnimationFrame(() => applyToolbarPosition(saved.left, saved.top, false));
+    }
+  } catch {
+    localStorage.removeItem(toolbarPositionKey);
+  }
+}
+
+function shouldDragToolbar(target) {
+  return target === toolbar || Boolean(target.closest('.annotation-brand'));
 }
 
 function clearObjects() {
@@ -70,6 +106,10 @@ function resizeCanvas() {
   canvas.height = Math.round(window.innerHeight * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   redraw();
+  if (toolbar.classList.contains('toolbar-dragged')) {
+    const rect = toolbar.getBoundingClientRect();
+    applyToolbarPosition(rect.left, rect.top, true);
+  }
 }
 
 function pointFromEvent(event) {
@@ -212,6 +252,35 @@ toolbar.addEventListener('click', (event) => {
 
 toolbar.addEventListener('pointerenter', wakeToolbar);
 toolbar.addEventListener('pointermove', wakeToolbar);
+toolbar.addEventListener('pointerdown', (event) => {
+  wakeToolbar();
+  if (!standaloneMode || !shouldDragToolbar(event.target)) return;
+  const rect = toolbar.getBoundingClientRect();
+  toolbarDrag = {
+    pointerId: event.pointerId,
+    offsetX: event.clientX - rect.left,
+    offsetY: event.clientY - rect.top
+  };
+  toolbar.classList.add('dragging');
+  toolbar.setPointerCapture(event.pointerId);
+});
+
+toolbar.addEventListener('pointermove', (event) => {
+  if (!toolbarDrag || toolbarDrag.pointerId !== event.pointerId) return;
+  event.preventDefault();
+  applyToolbarPosition(event.clientX - toolbarDrag.offsetX, event.clientY - toolbarDrag.offsetY);
+});
+
+toolbar.addEventListener('pointerup', (event) => {
+  if (!toolbarDrag || toolbarDrag.pointerId !== event.pointerId) return;
+  toolbarDrag = null;
+  toolbar.classList.remove('dragging');
+});
+
+toolbar.addEventListener('pointercancel', () => {
+  toolbarDrag = null;
+  toolbar.classList.remove('dragging');
+});
 canvas.addEventListener('pointermove', () => {
   if (toolbarCollapsed || drawing) return;
   scheduleAutoHide();
@@ -269,7 +338,10 @@ if (standaloneMode) {
   stopButton.textContent = 'Hide';
   stopButton.title = 'Hide annotation tools';
   closeButton.textContent = 'Navigate';
+  toolbar.classList.add('toolbar-drag-handle');
+  document.querySelector('.annotation-brand')?.classList.add('toolbar-drag-handle');
 }
+restoreToolbarPosition();
 applyInputMode(true);
 scheduleAutoHide();
 window.screenStudioAnnotation.ready({

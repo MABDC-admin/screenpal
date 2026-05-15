@@ -73,6 +73,19 @@ body {
   transition: opacity 180ms ease, transform 180ms ease;
 }
 
+.toolbar.toolbar-dragged {
+  bottom: auto;
+  transform: none;
+}
+
+.toolbar.dragging {
+  cursor: grabbing;
+}
+
+.toolbar-drag-handle {
+  cursor: grab;
+}
+
 .annotation-brand {
   display: none;
   align-items: center;
@@ -100,6 +113,10 @@ body.toolbar-collapsed .toolbar {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-50%) translateY(18px) scale(0.96);
+}
+
+body.toolbar-collapsed .toolbar.toolbar-dragged {
+  transform: translateY(18px) scale(0.96);
 }
 
 body.toolbar-collapsed .collapsed-tool {
@@ -210,5 +227,10 @@ body.standalone-mode.navigation-mode .collapsed-tool {
     transform: none;
     flex-wrap: wrap;
     justify-content: center;
+  }
+
+  .toolbar.toolbar-dragged {
+    right: auto;
+    bottom: auto;
   }
 }
