@@ -82,6 +82,60 @@ body {
   transform: none;
 }
 
+.toolbar.toolbar-vertical {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  width: 132px;
+  max-width: none;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+  gap: 7px;
+}
+
+.toolbar.toolbar-vertical button,
+.toolbar.toolbar-vertical .color-field,
+.toolbar.toolbar-vertical .size-field {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+}
+
+.toolbar.toolbar-vertical .annotation-brand {
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.toolbar.toolbar-vertical .annotation-brand span {
+  max-width: 76px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolbar.toolbar-vertical .color-field,
+.toolbar.toolbar-vertical .size-field {
+  padding: 0 7px;
+}
+
+.toolbar.toolbar-vertical .size-field {
+  flex-direction: column;
+  align-items: stretch;
+  height: 52px;
+  gap: 2px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.toolbar.toolbar-vertical .size-field span {
+  text-align: center;
+}
+
+.toolbar.toolbar-vertical .size-field input {
+  width: 100%;
+}
+
 .toolbar.dragging {
   cursor: grabbing;
 }
@@ -339,6 +393,10 @@ body.toolbar-collapsed .toolbar.toolbar-dragged {
   transform: translateY(18px) scale(0.96);
 }
 
+body.toolbar-collapsed .toolbar.toolbar-vertical {
+  transform: translateX(0) translateY(18px) scale(0.96);
+}
+
 body.toolbar-collapsed .collapsed-tool {
   opacity: 1;
   pointer-events: auto;
@@ -470,6 +528,14 @@ body.standalone-mode.navigation-mode .collapsed-tool {
   .toolbar.toolbar-dragged {
     right: auto;
     bottom: auto;
+  }
+
+  .toolbar.toolbar-vertical {
+    right: auto;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    width: 128px;
+    max-height: calc(100vh - 16px);
   }
 
   .supplement-panel {

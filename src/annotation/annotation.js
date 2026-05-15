@@ -38,6 +38,7 @@ const standaloneMode = new URLSearchParams(window.location.search).get('standalo
 const ctx = canvas.getContext('2d');
 const objects = [];
 const toolbarPositionKey = 'screenStudioAnnotationToolbarPosition';
+const toolbarEdgeThreshold = 84;
 const emojiGroups = {
   Smileys: '😀 😃 😄 😁 😆 😅 😂 🤣 🥲 ☺️ 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🥸 🤩 🥳 😏 😒 😞 😔 😟 😕 🙁 ☹️ 😣 😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🫣 🤗 🫡 🤔 🫢 🤭 🤫 🤥 😶 😶‍🌫️ 😐 😑 😬 🫨 🙄 😯 😦 😧 😮 😲 🥱 😴 🤤 😪 😮‍💨 😵 😵‍💫 🤐 🥴 🤢 🤮 🤧 😷 🤒 🤕 🤑 🤠'.split(' '),
   People: '👋 🤚 🖐️ ✋ 🖖 🫱 🫲 🫳 🫴 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 🖕 👇 ☝️ 🫵 👍 👎 ✊ 👊 🤛 🤜 👏 🙌 🫶 👐 🤲 🤝 🙏 ✍️ 💅 🤳 💪 🦾 🦿 🦵 🦶 👂 🦻 👃 🧠 🫀 🫁 🦷 🦴 👀 👁️ 👅 👄 🫦 👶 🧒 👦 👧 🧑 👱 👨 🧔 👩 🧓 👴 👵 🙍 🙎 🙅 🙆 💁 🙋 🧏 🙇 🤦 🤷'.split(' '),
@@ -106,14 +107,36 @@ function clampToolbarPosition(left, top) {
   };
 }
 
+function toolbarEdgeForPosition(left) {
+  const rect = toolbar.getBoundingClientRect();
+  if (left <= toolbarEdgeThreshold) return 'left';
+  if (left + rect.width >= window.innerWidth - toolbarEdgeThreshold) return 'right';
+  return null;
+}
+
+function setToolbarOrientation(edge) {
+  toolbar.dataset.edge = edge || '';
+  toolbar.classList.toggle('toolbar-vertical', Boolean(edge));
+}
+
 function applyToolbarPosition(left, top, save = true) {
+  toolbar.classList.add('toolbar-dragged');
+  const edge = toolbarEdgeForPosition(left);
+  setToolbarOrientation(edge);
+  if (edge === 'right') {
+    const rect = toolbar.getBoundingClientRect();
+    left = window.innerWidth - rect.width - 8;
+  }
   const position = clampToolbarPosition(left, top);
   toolbar.classList.add('toolbar-dragged');
   toolbar.style.left = `${position.left}px`;
   toolbar.style.top = `${position.top}px`;
+  toolbar.style.right = 'auto';
   toolbar.style.bottom = 'auto';
   toolbar.style.transform = 'none';
   if (save) localStorage.setItem(toolbarPositionKey, JSON.stringify(position));
+  if (!supplementPanel.classList.contains('hidden')) positionSupplementPanel();
+  if (!emojiPanel.classList.contains('hidden')) positionEmojiPanel();
 }
 
 function restoreToolbarPosition() {
@@ -187,9 +210,17 @@ function toggleSupplementPanel(force) {
 function positionSupplementPanel() {
   const toolbarRect = toolbar.getBoundingClientRect();
   const panelRect = supplementPanel.getBoundingClientRect();
-  const left = Math.max(8, Math.min(toolbarRect.left, window.innerWidth - panelRect.width - 8));
-  const preferredTop = toolbarRect.top - panelRect.height - 8;
-  const top = preferredTop >= 8 ? preferredTop : Math.min(toolbarRect.bottom + 8, window.innerHeight - panelRect.height - 8);
+  const verticalEdge = toolbar.classList.contains('toolbar-vertical') ? toolbar.dataset.edge : '';
+  const preferredLeft = verticalEdge === 'left'
+    ? toolbarRect.right + 8
+    : verticalEdge === 'right'
+      ? toolbarRect.left - panelRect.width - 8
+      : toolbarRect.left;
+  const left = Math.max(8, Math.min(preferredLeft, window.innerWidth - panelRect.width - 8));
+  const preferredTop = verticalEdge ? toolbarRect.top : toolbarRect.top - panelRect.height - 8;
+  const top = verticalEdge
+    ? Math.max(8, Math.min(preferredTop, window.innerHeight - panelRect.height - 8))
+    : preferredTop >= 8 ? preferredTop : Math.min(toolbarRect.bottom + 8, window.innerHeight - panelRect.height - 8);
   supplementPanel.style.left = `${left}px`;
   supplementPanel.style.top = `${Math.max(8, top)}px`;
   supplementPanel.style.bottom = 'auto';
@@ -199,9 +230,17 @@ function positionSupplementPanel() {
 function positionEmojiPanel() {
   const toolbarRect = toolbar.getBoundingClientRect();
   const panelRect = emojiPanel.getBoundingClientRect();
-  const left = Math.max(8, Math.min(toolbarRect.left, window.innerWidth - panelRect.width - 8));
-  const preferredTop = toolbarRect.top - panelRect.height - 8;
-  const top = preferredTop >= 8 ? preferredTop : Math.min(toolbarRect.bottom + 8, window.innerHeight - panelRect.height - 8);
+  const verticalEdge = toolbar.classList.contains('toolbar-vertical') ? toolbar.dataset.edge : '';
+  const preferredLeft = verticalEdge === 'left'
+    ? toolbarRect.right + 8
+    : verticalEdge === 'right'
+      ? toolbarRect.left - panelRect.width - 8
+      : toolbarRect.left;
+  const left = Math.max(8, Math.min(preferredLeft, window.innerWidth - panelRect.width - 8));
+  const preferredTop = verticalEdge ? toolbarRect.top : toolbarRect.top - panelRect.height - 8;
+  const top = verticalEdge
+    ? Math.max(8, Math.min(preferredTop, window.innerHeight - panelRect.height - 8))
+    : preferredTop >= 8 ? preferredTop : Math.min(toolbarRect.bottom + 8, window.innerHeight - panelRect.height - 8);
   emojiPanel.style.left = `${left}px`;
   emojiPanel.style.top = `${Math.max(8, top)}px`;
   emojiPanel.style.bottom = 'auto';
